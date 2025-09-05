@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { AppSidebar, type BgPreset, type LinearGradient, type WindowStyle, type ShadowStrength, type Pattern } from '@/components/app-sidebar'
-import { drawRoundedRect, clipRect } from './canvas-utils'
+import { AppSidebar, type BgPreset, type LinearGradient, type WindowStyle, type ShadowStrength } from '@/components/app-sidebar'
+import { renderComposition } from './renderer'
+import type { LayoutInfo } from './renderer'
 
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { Button } from '@/components/ui/button'
-import { Crop, Type as TypeIcon, Square, Circle } from 'lucide-react'
+// Toolbar buttons are encapsulated in Toolbar component
+import { Toolbar } from './Toolbar'
+import { CropOverlay } from './CropOverlay'
+import { TextInspector } from './TextInspector'
+import type { Rect, TextNode } from './types'
+import { TextOverlay } from './TextOverlay'
 
 type Padding = { x: number; y: number }
 
@@ -43,11 +48,17 @@ export default function Editor() {
   // Canvas base size independent of scale/target width
   const baseSizeRef = useRef<{ w: number; h: number } | null>(null)
   const layoutKeyRef = useRef<string>("")
+  const [viewScale, setViewScale] = useState(1)
+  const viewScaleRef = useRef(1)
   // Crop states
-  type Rect = { x: number; y: number; w: number; h: number }
   const [cropRect, setCropRect] = useState<Rect | null>(null) // in source image pixels
   const [cropSelection, setCropSelection] = useState<Rect | null>(null) // in canvas pixels
-  const [activeTool, setActiveTool] = useState<'none' | 'crop'>('none')
+  const [activeTool, setActiveTool] = useState<'none' | 'crop' | 'text'>('none')
+  const [aspectLocked, setAspectLocked] = useState(false)
+  const baseAspectRef = useRef(1)
+  const [texts, setTexts] = useState<TextNode[]>([])
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+  const [contentLayout, setContentLayout] = useState<LayoutInfo | null>(null)
   const didAutoFitRef = useRef(false)
   // Preserve canvas size for layout; do not change on scale/targetWidth
   // (declared above)
@@ -113,177 +124,49 @@ export default function Editor() {
     c.style.height = `${cssH}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
+    // compute view scale to fit stage without scroll
+    const stage = stageRef.current
+    if (stage) {
+      const sRect = stage.getBoundingClientRect()
+      const margin = 48
+      const maxW = Math.max(1, sRect.width - margin)
+      const maxH = Math.max(1, sRect.height - margin)
+      const vs = Math.min(1, maxW / cssW, maxH / cssH)
+      setViewScale(vs)
+      viewScaleRef.current = vs
+    }
+
     // Clear
     ctx.clearRect(0, 0, cssW, cssH)
 
-    // Background (solid | linear | pattern)
-    if (bgPreset.type === 'solid') {
-      ctx.fillStyle = bgPreset.color
-      ctx.fillRect(0, 0, cssW, cssH)
-    } else if (bgPreset.type === 'linear') {
-      const angleRad = (bgPreset.angle * Math.PI) / 180
-      const cx = cssW / 2
-      const cy = cssH / 2
-      const r = Math.max(cssW, cssH)
-      const dx = Math.cos(angleRad)
-      const dy = Math.sin(angleRad)
-      const g = ctx.createLinearGradient(cx - dx * r, cy - dy * r, cx + dx * r, cy + dy * r)
-      for (const s of bgPreset.stops) g.addColorStop(Math.min(1, Math.max(0, s.pos)), s.color)
-      ctx.fillStyle = g
-      ctx.fillRect(0, 0, cssW, cssH)
-    } else {
-      const p = bgPreset as Pattern
-      const tile = document.createElement('canvas')
-      const t = Math.max(8, Math.min(128, Math.floor(p.scale)))
-      tile.width = t
-      tile.height = t
-      const tctx = tile.getContext('2d')!
-      tctx.fillStyle = p.bg
-      tctx.fillRect(0, 0, t, t)
-      tctx.fillStyle = p.fg
-      tctx.strokeStyle = p.fg
-      tctx.lineWidth = Math.max(1, Math.round(t * 0.06))
-      switch (p.name) {
-        case 'dots': {
-          const rdot = Math.max(1, Math.round(t * 0.12))
-          tctx.beginPath()
-          tctx.arc(t / 2, t / 2, rdot, 0, Math.PI * 2)
-          tctx.fill()
-          break
-        }
-        case 'grid': {
-          tctx.beginPath()
-          tctx.moveTo(0, 0)
-          tctx.lineTo(0, t)
-          tctx.moveTo(0, 0)
-          tctx.lineTo(t, 0)
-          tctx.stroke()
-          break
-        }
-        case 'diagonal': {
-          tctx.beginPath()
-          tctx.moveTo(0, t)
-          tctx.lineTo(t, 0)
-          tctx.stroke()
-          break
-        }
-        case 'wave': {
-          const amp = t * 0.15
-          const period = t
-          tctx.beginPath()
-          for (let x = 0; x <= t; x++) {
-            const y = t / 2 + Math.sin((x / period) * 2 * Math.PI) * amp
-            if (x === 0) tctx.moveTo(x, y)
-            else tctx.lineTo(x, y)
-          }
-          tctx.stroke()
-          break
-        }
-        case 'icons': {
-          const s = Math.round(t * 0.3)
-          const r = Math.round(s * 0.25)
-          tctx.beginPath()
-          tctx.moveTo(r, 0)
-          tctx.arcTo(s, 0, s, s, r)
-          tctx.arcTo(s, s, 0, s, r)
-          tctx.arcTo(0, s, 0, 0, r)
-          tctx.arcTo(0, 0, s, 0, r)
-          tctx.closePath()
-          tctx.fill()
-          break
-        }
-      }
-      const pattern = ctx.createPattern(tile, 'repeat')!
-      ctx.fillStyle = pattern as any
-      ctx.fillRect(0, 0, c.width, c.height)
-    }
+    // Render full composition using renderer
+    const layout = renderComposition(ctx, cssW, cssH, {
+      bgPreset,
+      padding,
+      shadowStrength,
+      showWindow,
+      windowStyle,
+      windowBarColor,
+      windowBar,
+      cornerRadius,
+      image: img,
+      cropRect,
+      scaledW,
+      scaledH,
+      offsetX: imageOffset.x,
+      offsetY: imageOffset.y,
+      texts: texts.map(t => ({ ...t })),
+    })
+    setContentLayout(layout)
 
-    const contentX = padding.x + imageOffset.x
-    const contentY = padding.y + extraTop + imageOffset.y
-
-    // Window frame + shadow and content clipping
-    if (showWindow) {
-      const winX = padding.x + imageOffset.x
-      const winY = padding.y + imageOffset.y
-      const winW = scaledW
-      const winH = scaledH + windowBar
-      if (shadowStrength !== 'off') {
-        ctx.save()
-        const config: Record<ShadowStrength, { blur: number; offsetY: number; alpha: number }> = {
-          off: { blur: 0, offsetY: 0, alpha: 0 },
-          subtle: { blur: 12, offsetY: 4, alpha: 0.12 },
-          medium: { blur: 28, offsetY: 8, alpha: 0.18 },
-          strong: { blur: 48, offsetY: 16, alpha: 0.25 },
-        }
-        const s = config[shadowStrength]
-        ctx.shadowColor = `rgba(0,0,0,${s.alpha})`
-        ctx.shadowBlur = s.blur
-        ctx.shadowOffsetY = s.offsetY
-        drawRoundedRect(ctx, winX, winY, winW, winH, cornerRadius)
-        ctx.fillStyle = '#ffffff'
-        ctx.fill()
-        ctx.restore()
-      }
-      ctx.save()
-      drawRoundedRect(ctx, winX, winY, winW, winH, cornerRadius)
-      ctx.clip()
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(winX, winY, winW, winH)
-      // Title bar
-      ctx.fillStyle = windowBarColor
-      ctx.fillRect(winX, winY, winW, windowBar)
-      // Traffic lights (hidden for title-only minimal style)
-      if (windowStyle !== 'title') {
-        const tlY = winY + windowBar / 2
-        const tlXs = [winX + 18, winX + 42, winX + 66]
-        const colors = ['#ff5f57', '#febc2e', '#28c840']
-        tlXs.forEach((x, i) => {
-          ctx.beginPath()
-          ctx.fillStyle = colors[i]
-          ctx.arc(x, tlY, 6, 0, Math.PI * 2)
-          ctx.fill()
-        })
-      }
-
-      // Optional notch style
-      if (windowStyle === 'notch') {
-        ctx.save()
-        ctx.fillStyle = windowBarColor
-        const notchW = Math.min(180, winW * 0.25)
-        const notchH = 18
-        const notchR = 8
-        const nx = winX + winW / 2 - notchW / 2
-        const ny = winY + windowBar - notchH
-        drawRoundedRect(ctx, nx, ny, notchW, notchH, notchR)
-        ctx.fill()
-        ctx.restore()
-      }
-      ctx.restore()
-    }
-
-    // Screenshot image
-    ctx.save()
-    // Clip strictly to the content area (below the window bar) so the bar never overlays the image.
-    if (showWindow) {
-      clipRect(ctx, contentX, contentY, scaledW, scaledH)
-    }
-    const sx = cropRect ? cropRect.x : 0
-    const sy = cropRect ? cropRect.y : 0
-    const sw = cropRect ? cropRect.w : img.width
-    const sh = cropRect ? cropRect.h : img.height
-    ctx.drawImage(img, sx, sy, sw, sh, contentX, contentY, scaledW, scaledH)
-    ctx.restore()
-
-    // position resize handle at the screenshot's bottom-right corner
+    // position resize handle at the screenshot's bottom-right corner (CSS pixels)
     queueMicrotask(() => {
       const stage = stageRef.current
       if (!stage || !c) return
       const sRect = stage.getBoundingClientRect()
       const cRect = c.getBoundingClientRect()
-      const scaleX = cRect.width / c.width
-      const scaleY = cRect.height / c.height
-      const imgRight = (contentX + scaledW) * scaleX
-      const imgBottom = (contentY + scaledH) * scaleY
+      const imgRight = (layout.contentX + layout.scaledW) * viewScaleRef.current
+      const imgBottom = (layout.contentY + layout.scaledH) * viewScaleRef.current
       setHandlePos({
         left: cRect.left - sRect.left + imgRight,
         top: cRect.top - sRect.top + imgBottom,
@@ -325,79 +208,65 @@ export default function Editor() {
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <div className="text-sm text-muted-foreground">Editor</div>
-          <div className="ml-4 flex items-center gap-2">
-            <Button
-              variant={activeTool === 'crop' ? 'default' : 'outline'}
-              size="icon"
-              title="Crop"
-              onClick={() => {
-                if (activeTool === 'crop') {
-                  setActiveTool('none')
-                  setCropSelection(null)
-                } else {
-                  setActiveTool('crop')
-                }
-              }}
-            >
-              <Crop />
-            </Button>
-            <Button variant="outline" size="icon" title="Text" disabled>
-              <TypeIcon />
-            </Button>
-            <Button variant="outline" size="icon" title="Rectangle" disabled>
-              <Square />
-            </Button>
-            <Button variant="outline" size="icon" title="Circle" disabled>
-              <Circle />
-            </Button>
-          </div>
+          <Toolbar
+            activeTool={activeTool}
+            onToggleCrop={() => {
+              if (activeTool === 'crop') { setActiveTool('none'); setCropSelection(null) }
+              else setActiveTool('crop')
+            }}
+            onApplyCrop={() => {
+              if (!img || !cropSelection) return
+              const extraTop = showWindow ? windowBar : 0
+              const srcW = cropRect ? cropRect.w : img.width
+              const srcH = cropRect ? cropRect.h : img.height
+              const scale = targetWidth ? Math.max(1, targetWidth) / srcW : imageScale
+              const contentX = padding.x + imageOffset.x
+              const contentY = padding.y + extraTop + imageOffset.y
+              const sx = Math.max(0, Math.round((cropSelection.x - contentX) / Math.max(1e-6, scale)))
+              const sy = Math.max(0, Math.round((cropSelection.y - contentY) / Math.max(1e-6, scale)))
+              const sw = Math.min(srcW, Math.round(cropSelection.w / Math.max(1e-6, scale)))
+              const sh = Math.min(srcH, Math.round(cropSelection.h / Math.max(1e-6, scale)))
+              setCropRect({ x: sx, y: sy, w: Math.max(1, sw), h: Math.max(1, sh) })
+              setActiveTool('none')
+              setCropSelection(null)
+            }}
+            onCancelCrop={() => { setActiveTool('none'); setCropSelection(null) }}
+            cropEnabled={!!cropSelection}
+            aspectLocked={aspectLocked}
+            onToggleAspect={() => setAspectLocked(v => !v)}
+            onToggleText={() => setActiveTool(t => (t === 'text' ? 'none' : 'text'))}
+          />
+          <TextInspector
+            value={texts.find(t => t.id === selectedTextId) ?? null}
+            onChange={(patch) => {
+              if (!selectedTextId) return
+              setTexts(ts => ts.map(t => t.id === selectedTextId ? { ...t, ...patch } : t))
+            }}
+            onRemove={() => {
+              if (!selectedTextId) return
+              setTexts(ts => ts.filter(t => t.id !== selectedTextId))
+              setSelectedTextId(null)
+            }}
+          />
           <div className="ml-auto flex items-center gap-2">
-            {activeTool === 'crop' && (
-              <>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    if (!img || !cropSelection) return
-                    const extraTop = showWindow ? windowBar : 0
-                    const srcW = cropRect ? cropRect.w : img.width
-                    const srcH = cropRect ? cropRect.h : img.height
-                    const scale = targetWidth ? Math.max(1, targetWidth) / srcW : imageScale
-                    const contentX = padding.x + imageOffset.x
-                    const contentY = padding.y + extraTop + imageOffset.y
-                    const sx = Math.max(0, Math.round((cropSelection.x - contentX) / Math.max(1e-6, scale)))
-                    const sy = Math.max(0, Math.round((cropSelection.y - contentY) / Math.max(1e-6, scale)))
-                    const sw = Math.min(srcW, Math.round(cropSelection.w / Math.max(1e-6, scale)))
-                    const sh = Math.min(srcH, Math.round(cropSelection.h / Math.max(1e-6, scale)))
-                    setCropRect({ x: sx, y: sy, w: Math.max(1, sw), h: Math.max(1, sh) })
-                    setActiveTool('none')
-                    setCropSelection(null)
-                  }}
-                >
-                  Apply
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => { setActiveTool('none'); setCropSelection(null) }}>
-                  Cancel
-                </Button>
-              </>
-            )}
             <ThemeToggle />
             <SidebarTrigger className="-mr-1 rotate-180" />
           </div>
         </header>
-        <div ref={stageRef} className="relative flex flex-1 items-center justify-center bg-neutral-900 select-none">
+        <div ref={stageRef} className="relative flex flex-1 items-center justify-center bg-neutral-900 select-none overflow-hidden">
           {imageUrl ? (
             <>
               <canvas
                 ref={canvasRef}
-                style={{ cursor: activeTool === 'crop' ? 'crosshair' : isDragging ? 'grabbing' : 'grab' }}
+                style={{ cursor: activeTool === 'crop' ? 'crosshair' : activeTool === 'text' ? 'text' : isDragging ? 'grabbing' : 'grab', transform: `scale(${viewScale})` }}
                 onPointerDown={(e) => {
                   // Begin drag to reposition the screenshot (avoid if starting on handle)
                   if (!(e.target instanceof HTMLCanvasElement)) return
                   ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
                   const c = canvasRef.current!
                   const rect = c.getBoundingClientRect()
-                  const startCX = e.clientX - rect.left
-                  const startCY = e.clientY - rect.top
+                  const startCX = (e.clientX - rect.left) / viewScaleRef.current
+                  const startCY = (e.clientY - rect.top) / viewScaleRef.current
                   // helper: current content rect (window content area)
                   const srcW = cropRect ? cropRect.w : img!.width
                   const srcH = cropRect ? cropRect.h : img!.height
@@ -412,15 +281,26 @@ export default function Editor() {
                     const sx = Math.max(contentRect.x, Math.min(startCX, contentRect.x + contentRect.w))
                     const sy = Math.max(contentRect.y, Math.min(startCY, contentRect.y + contentRect.h))
                     setCropSelection({ x: sx, y: sy, w: 0, h: 0 })
+                    baseAspectRef.current = srcW / Math.max(1, srcH)
                     const move = (ev: PointerEvent) => {
-                      const cx0 = ev.clientX - rect.left
-                      const cy0 = ev.clientY - rect.top
+                      const cx0 = (ev.clientX - rect.left) / viewScaleRef.current
+                      const cy0 = (ev.clientY - rect.top) / viewScaleRef.current
                       const cx = Math.max(contentRect.x, Math.min(cx0, contentRect.x + contentRect.w))
                       const cy = Math.max(contentRect.y, Math.min(cy0, contentRect.y + contentRect.h))
-                      const x = Math.min(startCX, cx)
-                      const y = Math.min(startCY, cy)
-                      const w = Math.abs(cx - startCX)
-                      const h = Math.abs(cy - startCY)
+                      let x = Math.min(startCX, cx)
+                      let y = Math.min(startCY, cy)
+                      let w = Math.abs(cx - startCX)
+                      let h = Math.abs(cy - startCY)
+                      if (aspectLocked) {
+                        const target = baseAspectRef.current
+                        if (w / Math.max(1, h) > target) {
+                          h = Math.round(w / target)
+                          if (cy < startCY) y = startCY - h
+                        } else {
+                          w = Math.round(h * target)
+                          if (cx < startCX) x = startCX - w
+                        }
+                      }
                       setCropSelection({ x, y, w, h })
                     }
                     const up = () => {
@@ -430,12 +310,34 @@ export default function Editor() {
                     }
                     window.addEventListener('pointermove', move)
                     window.addEventListener('pointerup', up)
+                  } else if (activeTool === 'text') {
+                    // create a new text node where clicked
+                    const id = Math.random().toString(36).slice(2)
+                    const defaultText: TextNode = {
+                      id,
+                      x: startCX - (padding.x + imageOffset.x),
+                      y: startCY - (padding.y + (showWindow ? windowBar : 0) + imageOffset.y),
+                      text: 'Edit me',
+                      fontFamily: "Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+                      fontSize: 24,
+                      bold: false,
+                      italic: false,
+                      align: 'left',
+                      color: '#ffffff',
+                      outline: true,
+                      outlineColor: '#000000',
+                      outlineWidth: 2,
+                    }
+                    setTexts((arr) => [...arr, defaultText])
+                    setSelectedTextId(id)
+                    // Exit text tool so subsequent clicks don't create more text
+                    setActiveTool('none')
                   } else {
                     setIsDragging(true)
                     const start = { ...imageOffset }
                     const move = (ev: PointerEvent) => {
-                      const dx = ev.clientX - e.clientX
-                      const dy = ev.clientY - e.clientY
+                      const dx = (ev.clientX - e.clientX) / viewScaleRef.current
+                      const dy = (ev.clientY - e.clientY) / viewScaleRef.current
                       setImageOffset({ x: start.x + dx, y: start.y + dy })
                     }
                     const up = () => {
@@ -449,145 +351,45 @@ export default function Editor() {
                   }
                 }}
               />
-              {activeTool === 'crop' && img && cropSelection && (
-                <div
-                  className="absolute border-2 border-blue-500/80 bg-blue-500/10"
-                  style={(() => {
-                    const c = canvasRef.current
-                    const stage = stageRef.current
-                    if (!c || !stage) return {}
-                    const sRect = stage.getBoundingClientRect()
-                    const cRect = c.getBoundingClientRect()
-                    const scaleX = 1
-                    const scaleY = 1
-                    return {
-                      left: cRect.left - sRect.left + cropSelection.x * scaleX,
-                      top: cRect.top - sRect.top + cropSelection.y * scaleY,
-                      width: cropSelection.w * scaleX,
-                      height: cropSelection.h * scaleY,
-                    } as React.CSSProperties
-                  })()}
-                  onPointerDown={(e) => {
-                    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                    const startX = e.clientX
-                    const startY = e.clientY
-                    const start = { ...cropSelection }
-                    const move = (ev: PointerEvent) => {
-                      const dx = ev.clientX - startX
-                      const dy = ev.clientY - startY
-                      setCropSelection((sel) => sel ? { ...sel, x: start.x + dx, y: start.y + dy } : sel)
-                    }
-                    const up = () => {
-                      ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                      window.removeEventListener('pointermove', move)
-                      window.removeEventListener('pointerup', up)
-                    }
-                    window.addEventListener('pointermove', move)
-                    window.addEventListener('pointerup', up)
+              {activeTool === 'crop' && img && cropSelection && (() => {
+                const extraTop = showWindow ? windowBar : 0
+                const srcW = cropRect ? cropRect.w : img.width
+                const srcH = cropRect ? cropRect.h : img.height
+                const scale = targetWidth ? Math.max(1, targetWidth) / srcW : imageScale
+                const contentX = (contentLayout?.contentX ?? (padding.x + imageOffset.x))
+                const contentY = (contentLayout?.contentY ?? (padding.y + extraTop + imageOffset.y))
+                const contentRect = { x: contentX, y: contentY, w: Math.round(srcW * scale), h: Math.round(srcH * scale) }
+                return (
+                  <CropOverlay
+                    canvas={canvasRef.current}
+                    stage={stageRef.current}
+                    selection={cropSelection}
+                    setSelection={(r) => setCropSelection(r)}
+                    bounds={contentRect}
+                    aspectLocked={aspectLocked}
+                    baseAspect={baseAspectRef.current}
+                    scale={viewScale}
+                  />
+                )
+              })()}
+              {/* Text overlays */}
+              {!!texts.length && contentLayout && (
+                <TextOverlay
+                  canvas={canvasRef.current}
+                  stage={stageRef.current}
+                  scale={viewScale}
+                  texts={texts}
+                  selectedId={selectedTextId}
+                  onSelect={setSelectedTextId}
+                  onChange={(id, patch) => setTexts(ts => ts.map(t => t.id === id ? { ...t, ...patch } : t))}
+                  onCreate={(x, y) => {
+                    const id = Math.random().toString(36).slice(2)
+                    setTexts(ts => [...ts, { id, x, y, text: 'Text', fontFamily: 'Inter, system-ui, Arial, sans-serif', fontSize: 24, bold: false, italic: false, align: 'left', color: '#ffffff', outline: true, outlineColor: '#000000', outlineWidth: 2 }])
+                    setSelectedTextId(id)
                   }}
-                >
-                  {/* top-left handle */}
-                  <div
-                    className="absolute -top-2 -left-2 h-4 w-4 rounded-full bg-blue-500 border border-white/80 cursor-nw-resize"
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                      const startX = e.clientX
-                      const startY = e.clientY
-                      const start = { ...cropSelection! }
-                      const move = (ev: PointerEvent) => {
-                        const dx = ev.clientX - startX
-                        const dy = ev.clientY - startY
-                        const nx = start.x + dx
-                        const ny = start.y + dy
-                        const nw = Math.max(10, start.w - dx)
-                        const nh = Math.max(10, start.h - dy)
-                        setCropSelection({ x: Math.min(nx, start.x + start.w - 10), y: Math.min(ny, start.y + start.h - 10), w: nw, h: nh })
-                      }
-                      const up = () => {
-                        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                        window.removeEventListener('pointermove', move)
-                        window.removeEventListener('pointerup', up)
-                      }
-                      window.addEventListener('pointermove', move)
-                      window.addEventListener('pointerup', up)
-                    }}
-                  />
-                  {/* top-right handle */}
-                  <div
-                    className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-blue-500 border border-white/80 cursor-ne-resize"
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                      const startX = e.clientX
-                      const startY = e.clientY
-                      const start = { ...cropSelection! }
-                      const move = (ev: PointerEvent) => {
-                        const dx = ev.clientX - startX
-                        const dy = ev.clientY - startY
-                        const ny = start.y + dy
-                        const nw = Math.max(10, start.w + dx)
-                        const nh = Math.max(10, start.h - dy)
-                        setCropSelection({ x: start.x, y: Math.min(ny, start.y + start.h - 10), w: nw, h: nh })
-                      }
-                      const up = () => {
-                        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                        window.removeEventListener('pointermove', move)
-                        window.removeEventListener('pointerup', up)
-                      }
-                      window.addEventListener('pointermove', move)
-                      window.addEventListener('pointerup', up)
-                    }}
-                  />
-                  {/* bottom-left handle */}
-                  <div
-                    className="absolute -bottom-2 -left-2 h-4 w-4 rounded-full bg-blue-500 border border-white/80 cursor-sw-resize"
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                      const startX = e.clientX
-                      const startY = e.clientY
-                      const start = { ...cropSelection! }
-                      const move = (ev: PointerEvent) => {
-                        const dx = ev.clientX - startX
-                        const dy = ev.clientY - startY
-                        const nx = start.x + dx
-                        const nw = Math.max(10, start.w - dx)
-                        const nh = Math.max(10, start.h + dy)
-                        setCropSelection({ x: Math.min(nx, start.x + start.w - 10), y: start.y, w: nw, h: nh })
-                      }
-                      const up = () => {
-                        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                        window.removeEventListener('pointermove', move)
-                        window.removeEventListener('pointerup', up)
-                      }
-                      window.addEventListener('pointermove', move)
-                      window.addEventListener('pointerup', up)
-                    }}
-                  />
-                  <div
-                    className="absolute -bottom-2 -right-2 h-4 w-4 rounded-full bg-blue-500 border border-white/80 cursor-se-resize"
-                    onPointerDown={(e) => {
-                      e.stopPropagation()
-                      ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-                      const startX = e.clientX
-                      const startY = e.clientY
-                      const start = { ...cropSelection! }
-                      const move = (ev: PointerEvent) => {
-                        const dx = ev.clientX - startX
-                        const dy = ev.clientY - startY
-                        setCropSelection((sel) => sel ? { ...sel, w: Math.max(10, start.w + dx), h: Math.max(10, start.h + dy) } : sel)
-                      }
-                      const up = () => {
-                        ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
-                        window.removeEventListener('pointermove', move)
-                        window.removeEventListener('pointerup', up)
-                      }
-                      window.addEventListener('pointermove', move)
-                      window.addEventListener('pointerup', up)
-                    }}
-                  />
-                </div>
+                  // supply bounds so overlay can add content origin
+                  contentOrigin={{ x: contentLayout.contentX, y: contentLayout.contentY }}
+                />
               )}
               {/* drag handle */}
               {img && (

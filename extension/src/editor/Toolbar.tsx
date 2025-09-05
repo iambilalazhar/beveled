@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button'
-import { Crop, Type as TypeIcon, Square, Circle } from 'lucide-react'
+import { Crop, Type as TypeIcon, Square, Circle, Link as LinkIcon, Link2Off } from 'lucide-react'
 import type { ActiveTool } from './types'
 
 export function Toolbar({
@@ -8,12 +8,18 @@ export function Toolbar({
   onApplyCrop,
   onCancelCrop,
   cropEnabled,
+  aspectLocked,
+  onToggleAspect,
+  onToggleText,
 }: {
   activeTool: ActiveTool
   onToggleCrop: () => void
   onApplyCrop: () => void
   onCancelCrop: () => void
   cropEnabled: boolean
+  aspectLocked: boolean
+  onToggleAspect: () => void
+  onToggleText: () => void
 }) {
   return (
     <>
@@ -26,7 +32,16 @@ export function Toolbar({
         >
           <Crop />
         </Button>
-        <Button variant="outline" size="icon" title="Text" disabled>
+        <Button
+          variant={aspectLocked ? 'default' : 'outline'}
+          size="icon"
+          title={aspectLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+          onClick={onToggleAspect}
+          disabled={activeTool !== 'crop'}
+        >
+          {aspectLocked ? <LinkIcon /> : <Link2Off />}
+        </Button>
+        <Button variant={activeTool === 'text' ? 'default' : 'outline'} size="icon" title="Text" onClick={onToggleText}>
           <TypeIcon />
         </Button>
         <Button variant="outline" size="icon" title="Rectangle" disabled>
@@ -47,4 +62,3 @@ export function Toolbar({
     </>
   )
 }
-

@@ -132,6 +132,7 @@ export function renderComposition(
       fontParts.push(`${Math.max(1, Math.round(t.fontSize))}px`)
       fontParts.push(t.fontFamily)
       ctx.font = fontParts.join(' ')
+      ctx.direction = 'ltr' as CanvasDirection
       ctx.textAlign = t.align
       ctx.textBaseline = 'top'
       const tx = contentX + t.x
