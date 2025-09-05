@@ -16,16 +16,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
 
 export type LinearGradient = { type: 'linear'; angle: number; stops: { color: string; pos: number }[] }
 export type Solid = { type: 'solid'; color: string }
-export type BgPreset = LinearGradient | Solid
+export type Pattern = {
+  type: 'pattern'
+  name: 'dots' | 'grid' | 'diagonal' | 'wave' | 'icons' | 'cross' | 'crosshatch' | 'hex' | 'zigzag' | 'plus' | 'noise'
+  fg: string
+  bg: string
+  scale: number
+}
+export type BgPreset = LinearGradient | Solid | Pattern
 export type WindowStyle = 'regular' | 'notch' | 'title'
 export type ShadowStrength = 'off' | 'subtle' | 'medium' | 'strong'
 
 export function AppSidebar({
   solidPresets,
   gradientPresets,
+  defaultPattern,
   bgPreset,
   setBgPreset,
   padding,
@@ -38,11 +47,18 @@ export function AppSidebar({
   setShowWindow,
   shadowStrength,
   setShadowStrength,
+  cornerRadius,
+  setCornerRadius,
+  imageScale,
+  setImageScale,
+  targetWidth,
+  setTargetWidth,
   onDownload,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   solidPresets: string[]
   gradientPresets: LinearGradient[]
+  defaultPattern: Pattern
   bgPreset: BgPreset
   setBgPreset: (p: BgPreset) => void
   padding: { x: number; y: number }
@@ -55,24 +71,62 @@ export function AppSidebar({
   setShowWindow: (v: boolean) => void
   shadowStrength: ShadowStrength
   setShadowStrength: (v: ShadowStrength) => void
+  cornerRadius: number
+  setCornerRadius: (v: number) => void
+  imageScale: number
+  setImageScale: (v: number) => void
+  targetWidth: number | null
+  setTargetWidth: (v: number | null) => void
   onDownload: () => void
 }) {
   return (
     <Sidebar {...props}>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Size</SidebarGroupLabel>
+          <SidebarGroupContent className="space-y-4 px-4 py-2">
+            <div className="space-y-2">
+              <Label>Scale: {Math.round(imageScale * 100)}%</Label>
+              <Slider min={10} max={300} step={1} value={[Math.round(imageScale * 100)]} onValueChange={(v) => setImageScale((v[0] ?? 100) / 100)} />
+            </div>
+            <div className="space-y-2">
+              <Label>Width (px)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  className="w-40"
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={targetWidth ?? ''}
+                  placeholder="auto"
+                  onChange={(e) => {
+                    const val = e.currentTarget.value
+                    if (val === '') setTargetWidth(null)
+                    else setTargetWidth(Math.max(1, Math.floor(Number(val))))
+                  }}
+                />
+                <Button variant="outline" size="sm" onClick={() => setTargetWidth(null)}>Auto</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Height adjusts automatically to preserve aspect ratio.</p>
+            </div>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <Separator />
+        <SidebarGroup>
           <SidebarGroupLabel>Background</SidebarGroupLabel>
           <SidebarGroupContent className="px-4 py-2 space-y-3">
             <Tabs
               value={bgPreset.type}
               onValueChange={(v) => {
-                if (v === 'solid' && bgPreset.type !== 'solid') setBgPreset({ type: 'solid', color: solidPresets[0] })
-                if (v === 'linear' && bgPreset.type !== 'linear') setBgPreset(gradientPresets[0])
+                if (v === 'solid') setBgPreset({ type: 'solid', color: solidPresets[0] })
+                if (v === 'linear') setBgPreset(gradientPresets[0])
+                if (v === 'pattern') setBgPreset(defaultPattern)
               }}
             >
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="solid">Solid</TabsTrigger>
                 <TabsTrigger value="linear">Gradient</TabsTrigger>
+                <TabsTrigger value="pattern">Pattern</TabsTrigger>
               </TabsList>
               <TabsContent value="solid" className="mt-3">
                 <div className="grid grid-cols-6 gap-2">
@@ -147,6 +201,45 @@ export function AppSidebar({
                   </div>
                 )}
               </TabsContent>
+              <TabsContent value="pattern" className="mt-3 space-y-3">
+                <div className="space-y-2">
+                  <Label>Pattern</Label>
+                  <Select
+                    value={bgPreset.type === 'pattern' ? bgPreset.name : 'dots'}
+                    onValueChange={(name) => {
+                      const base = bgPreset.type === 'pattern' ? bgPreset : defaultPattern
+                      setBgPreset({ type: 'pattern', name: name as Pattern['name'], fg: base.fg, bg: base.bg, scale: base.scale })
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(['dots','grid','diagonal','wave','icons','cross','crosshatch','hex','zigzag','plus','noise'] as const).map((name) => (
+                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {bgPreset.type === 'pattern' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Foreground</Label>
+                        <input type="color" value={bgPreset.fg} onChange={(e) => setBgPreset({ ...bgPreset, fg: e.target.value })} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Background</Label>
+                        <input type="color" value={bgPreset.bg} onChange={(e) => setBgPreset({ ...bgPreset, bg: e.target.value })} />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Scale: {bgPreset.scale}px</Label>
+                      <Slider min={8} max={64} step={1} value={[bgPreset.scale]} onValueChange={(v) => setBgPreset({ ...bgPreset, scale: v[0] ?? bgPreset.scale })} />
+                    </div>
+                  </>
+                )}
+              </TabsContent>
             </Tabs>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -157,24 +250,10 @@ export function AppSidebar({
             <div className="space-y-2">
               <Label>Horizontal: {padding.x}px</Label>
               <Slider max={200} step={1} value={[padding.x]} onValueChange={(v) => setPadding((p) => ({ ...p, x: v[0] ?? p.x }))} />
-              <ToggleGroup type="single" value={String(padding.x)} onValueChange={(val) => val && setPadding((p) => ({ ...p, x: Number(val) }))} className="justify-between">
-                {[0, 32, 64, 96, 128, 160, 200].map((v) => (
-                  <ToggleGroupItem key={v} value={String(v)} className="px-2 py-1 text-xs">
-                    {v}px
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
             </div>
             <div className="space-y-2">
               <Label>Vertical: {padding.y}px</Label>
               <Slider max={200} step={1} value={[padding.y]} onValueChange={(v) => setPadding((p) => ({ ...p, y: v[0] ?? p.y }))} />
-              <ToggleGroup type="single" value={String(padding.y)} onValueChange={(val) => val && setPadding((p) => ({ ...p, y: Number(val) }))} className="justify-between">
-                {[0, 32, 64, 96, 128, 160, 200].map((v) => (
-                  <ToggleGroupItem key={v} value={String(v)} className="px-2 py-1 text-xs">
-                    {v}px
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
             </div>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -194,6 +273,10 @@ export function AppSidebar({
                   <SelectItem value="title">Title only</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Corner radius: {cornerRadius}px</Label>
+              <Slider max={40} min={0} step={1} value={[cornerRadius]} onValueChange={(v) => setCornerRadius(v[0] ?? cornerRadius)} />
             </div>
             <div className="space-y-2">
               <Label>Bar color</Label>
@@ -233,4 +316,3 @@ export function AppSidebar({
     </Sidebar>
   )
 }
-
