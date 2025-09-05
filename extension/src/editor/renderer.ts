@@ -1,5 +1,6 @@
 import { drawRoundedRect, clipRect } from './canvas-utils'
 import type { BgPreset, LinearGradient, Pattern, ShadowStrength, WindowStyle } from '@/components/app-sidebar'
+import type { TextNode } from './types'
 
 type RenderParams = {
   bgPreset: BgPreset
@@ -16,6 +17,7 @@ type RenderParams = {
   scaledH: number
   offsetX: number
   offsetY: number
+  texts?: TextNode[]
 }
 
 export type LayoutInfo = {
@@ -31,7 +33,7 @@ export function renderComposition(
   canvasH: number,
   p: RenderParams
 ): LayoutInfo {
-  const { bgPreset, padding, shadowStrength, showWindow, windowStyle, windowBarColor, windowBar, cornerRadius, image, cropRect, scaledW, scaledH, offsetX, offsetY } = p
+  const { bgPreset, padding, shadowStrength, showWindow, windowStyle, windowBarColor, windowBar, cornerRadius, image, cropRect, scaledW, scaledH, offsetX, offsetY, texts } = p
 
   // Clear
   ctx.clearRect(0, 0, canvasW, canvasH)
@@ -120,6 +122,35 @@ export function renderComposition(
   ctx.drawImage(image, sx, sy, sw, sh, contentX, contentY, scaledW, scaledH)
   ctx.restore()
 
+  // Text overlays (drawn above image/frame)
+  if (texts && texts.length) {
+    texts.forEach((t) => {
+      const fontParts = [] as string[]
+      if (t.italic) fontParts.push('italic')
+      if (t.bold) fontParts.push('700')
+      else fontParts.push('400')
+      fontParts.push(`${Math.max(1, Math.round(t.fontSize))}px`)
+      fontParts.push(t.fontFamily)
+      ctx.font = fontParts.join(' ')
+      ctx.textAlign = t.align
+      ctx.textBaseline = 'top'
+      const tx = contentX + t.x
+      let y = contentY + t.y
+      for (const line of t.text.split(/\n/)) {
+        if (t.outline && t.outlineWidth > 0) {
+          ctx.lineWidth = t.outlineWidth
+          ctx.strokeStyle = t.outlineColor
+          ctx.strokeText(line, tx, y)
+        }
+        ctx.fillStyle = t.color
+        ctx.fillText(line, tx, y)
+        const metrics = ctx.measureText(line)
+        const lineH = Math.max(t.fontSize, (metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) || t.fontSize) * 1.2
+        y += lineH
+      }
+    })
+  }
+
   return { contentX, contentY, scaledW, scaledH }
 }
 
@@ -200,4 +231,3 @@ function fillPattern(ctx: CanvasRenderingContext2D, w: number, h: number, p: Pat
   ctx.fillStyle = pattern as any
   ctx.fillRect(0, 0, w, h)
 }
-
