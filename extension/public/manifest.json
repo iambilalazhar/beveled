@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Good Screenshots",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Good Screenshots",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "storage",
+    "downloads",
+    "scripting"
+  ],
+  "host_permissions": ["<all_urls>"]
+}
+
