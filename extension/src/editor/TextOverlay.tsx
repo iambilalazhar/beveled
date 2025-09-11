@@ -1,6 +1,17 @@
 
 import type { TextNode } from './types'
 
+function hexToRgba(hex: string, alpha: number): string {
+  const h = hex.replace('#', '')
+  const parse = (s: string) => parseInt(s, 16)
+  const r = h.length === 3 ? parse(h[0] + h[0]) : parse(h.slice(0, 2))
+  const g = h.length === 3 ? parse(h[1] + h[1]) : parse(h.slice(2, 4))
+  const b = h.length === 3 ? parse(h[2] + h[2]) : parse(h.slice(4, 6))
+  const a = Math.min(1, Math.max(0, alpha))
+  return `rgba(${r}, ${g}, ${b}, ${a})`
+}
+import LexicalText from './LexicalText'
+
 export function TextOverlay({
   canvas,
   stage,
@@ -31,14 +42,43 @@ export function TextOverlay({
   return (
     <>
       {texts.map((t) => {
-        const left = baseLeft + (contentOrigin.x + t.x) * scale
-        const top = baseTop + (contentOrigin.y + t.y) * scale
+        const isContentAnchored = (t.positionAnchor ?? 'content') === 'content'
+        const left = isContentAnchored
+          ? baseLeft + (contentOrigin.x + t.x) * scale
+          : baseLeft + t.x * scale
+        const top = isContentAnchored
+          ? baseTop + (contentOrigin.y + t.y) * scale
+          : baseTop + t.y * scale
         const isSel = t.id === selectedId
+        const shadowCol = hexToRgba(t.shadowColor ?? '#000000', t.shadow ? (t.shadowAlpha ?? 0.5) : 0)
         return (
           <div
             key={t.id}
             className={`absolute ${isSel ? 'ring-2 ring-blue-500/70' : ''}`}
-            style={{ left, top, cursor: 'move' }}
+            data-text-id={t.id}
+            style={{
+              left,
+              top,
+              cursor: 'move',
+              // Align the wrapper around the anchor X so centered/right-aligned
+              // texts are truly centered relative to t.x (matches canvas rendering)
+              transform: t.align === 'center' ? 'translate(-50%, 0)' : (t.align === 'right' ? 'translate(-100%, 0)' : 'none'),
+              // Visual background/shadow mirror for live editing
+              background: t.background
+                ? (t.backgroundType === 'linear'
+                    ? undefined
+                    : hexToRgba(t.backgroundColor ?? '#000000', t.backgroundAlpha ?? 0.8))
+                : 'transparent',
+              backgroundImage: t.background && t.backgroundType === 'linear'
+                ? `linear-gradient(${t.backgroundAngle ?? 90}deg, ${hexToRgba(t.backgroundColor ?? '#111827', t.backgroundAlpha ?? 0.8)}, ${hexToRgba(t.backgroundColor2 ?? '#374151', t.backgroundAlpha ?? 0.8)})`
+                : undefined,
+              borderRadius: t.background ? (t.backgroundRadius ?? 6) : undefined,
+              paddingLeft: t.background ? (t.backgroundPaddingX ?? 6) : undefined,
+              paddingRight: t.background ? (t.backgroundPaddingX ?? 6) : undefined,
+              paddingTop: t.background ? (t.backgroundPaddingY ?? 2) : undefined,
+              paddingBottom: t.background ? (t.backgroundPaddingY ?? 2) : undefined,
+              boxShadow: t.shadow && t.background ? `${t.shadowOffsetX ?? 0}px ${t.shadowOffsetY ?? 2}px ${t.shadowBlur ?? 8}px ${shadowCol}` : undefined,
+            }}
             onPointerDown={(e) => {
               e.stopPropagation()
               onSelect(t.id)
@@ -75,11 +115,9 @@ export function TextOverlay({
               window.addEventListener('pointerup', up)
             }}
           >
-            <div
-              contentEditable
-              suppressContentEditableWarning
-              data-editable="true"
-              dir="ltr"
+            <LexicalText
+              value={t.text}
+              onChange={(val) => onChange(t.id, { text: val })}
               className="min-w-10 min-h-5 px-1 outline-none bg-transparent text-white"
               style={{
                 fontFamily: t.fontFamily,
@@ -87,24 +125,17 @@ export function TextOverlay({
                 fontWeight: t.bold ? 700 : 400,
                 fontStyle: t.italic ? 'italic' : 'normal',
                 textAlign: t.align as any,
-                direction: 'ltr',
-                unicodeBidi: 'bidi-override',
-                writingMode: 'horizontal-tb',
                 WebkitTextStroke: t.outline ? `${Math.max(0, t.outlineWidth * scale)}px ${t.outlineColor}` : undefined,
-                color: t.color,
+                color: (t.fillType ?? 'solid') === 'solid' ? t.color : undefined,
+                backgroundImage: (t.fillType ?? 'solid') === 'linear' ? `linear-gradient(${t.backgroundAngle ?? 0}deg, ${t.color}, ${t.fillColor2 ?? t.color})` : undefined,
+                WebkitBackgroundClip: (t.fillType ?? 'solid') === 'linear' ? 'text' as any : undefined,
+                backgroundClip: (t.fillType ?? 'solid') === 'linear' ? 'text' as any : undefined,
+                WebkitTextFillColor: (t.fillType ?? 'solid') === 'linear' ? 'transparent' : undefined,
+                textShadow: t.shadow && !t.background ? `${t.shadowOffsetX ?? 0}px ${t.shadowOffsetY ?? 2}px ${t.shadowBlur ?? 8}px ${shadowCol}` : undefined,
                 whiteSpace: 'pre',
               }}
-              onBlur={(e) => onChange(t.id, { text: e.currentTarget.innerText.replace(/^\u200E/, '') })}
-              onInput={(e) => onChange(t.id, { text: (e.currentTarget as HTMLElement).innerText.replace(/^\u200E/, '') })}
-              onKeyDown={(e) => {
-                // Prevent any RTL shortcuts
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-                  e.preventDefault()
-                }
-              }}
-            >
-              {'\u200E' + t.text}
-            </div>
+              singleLine={t.id === 'title' || t.id === 'subtitle'}
+            />
           </div>
         )
       })}

@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Good Screenshots",
-  "version": "0.1.0",
+  "version": "0.2.0",
+  "description": "Capture beautiful screenshots with full page, mobile, tablet, and desktop viewport options",
   "action": {
     "default_title": "Good Screenshots",
     "default_popup": "popup.html"
@@ -10,13 +11,27 @@
     "service_worker": "background.js",
     "type": "module"
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_end"
+    }
+  ],
   "permissions": [
     "activeTab",
     "tabs",
     "storage",
     "downloads",
-    "scripting"
+    "scripting",
+    "debugger"
   ],
-  "host_permissions": ["<all_urls>"]
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["content-script.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }
 

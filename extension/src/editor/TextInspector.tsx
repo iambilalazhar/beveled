@@ -67,6 +67,23 @@ export function TextInspector({
           <input type="color" value={value.outlineColor} onChange={(e) => onChange({ outlineColor: e.currentTarget.value })} disabled={!value.outline} />
           <Input className="w-16 h-8" type="number" min={0} max={20} value={value.outlineWidth} onChange={(e) => onChange({ outlineWidth: Math.max(0, Number(e.currentTarget.value || 0)) })} disabled={!value.outline} />
         </div>
+        <div className="flex items-center gap-1">
+          <Label className="text-xs">BG</Label>
+          <input type="checkbox" checked={!!value.background} onChange={(e) => onChange({ background: e.currentTarget.checked })} />
+          <input type="color" value={value.backgroundColor ?? '#000000'} onChange={(e) => onChange({ backgroundColor: e.currentTarget.value })} disabled={!value.background} />
+          <Input className="w-16 h-8" type="number" min={0} max={1} step={0.05} value={value.backgroundAlpha ?? 0.65} onChange={(e) => onChange({ backgroundAlpha: Math.min(1, Math.max(0, Number(e.currentTarget.value || 0))) })} disabled={!value.background} />
+          <Input className="w-16 h-8" type="number" min={0} max={64} value={value.backgroundPaddingX ?? 6} onChange={(e) => onChange({ backgroundPaddingX: Math.max(0, Number(e.currentTarget.value || 0)) })} disabled={!value.background} />
+          <Input className="w-16 h-8" type="number" min={0} max={64} value={value.backgroundPaddingY ?? 2} onChange={(e) => onChange({ backgroundPaddingY: Math.max(0, Number(e.currentTarget.value || 0)) })} disabled={!value.background} />
+          <Input className="w-16 h-8" type="number" min={0} max={64} value={value.backgroundRadius ?? 6} onChange={(e) => onChange({ backgroundRadius: Math.max(0, Number(e.currentTarget.value || 0)) })} disabled={!value.background} />
+        </div>
+        <div className="flex items-center gap-1">
+          <Label className="text-xs">Shadow</Label>
+          <input type="checkbox" checked={!!value.shadow} onChange={(e) => onChange({ shadow: e.currentTarget.checked })} />
+          <input type="color" value={value.shadowColor ?? '#000000'} onChange={(e) => onChange({ shadowColor: e.currentTarget.value })} disabled={!value.shadow} />
+          <Input className="w-16 h-8" type="number" min={0} max={64} value={value.shadowBlur ?? 8} onChange={(e) => onChange({ shadowBlur: Math.max(0, Number(e.currentTarget.value || 0)) })} disabled={!value.shadow} />
+          <Input className="w-16 h-8" type="number" min={-64} max={64} value={value.shadowOffsetX ?? 0} onChange={(e) => onChange({ shadowOffsetX: Number(e.currentTarget.value || 0) })} disabled={!value.shadow} />
+          <Input className="w-16 h-8" type="number" min={-64} max={64} value={value.shadowOffsetY ?? 2} onChange={(e) => onChange({ shadowOffsetY: Number(e.currentTarget.value || 0) })} disabled={!value.shadow} />
+        </div>
       </div>
       <Button variant="destructive" size="icon" title="Delete" onClick={onRemove}>
         <Trash2 />
