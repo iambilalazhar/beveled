@@ -56,6 +56,8 @@ extension/
   package.json          # Scripts & dependencies
 ```
 
+Note: All source code lives in this repository root.
+
 ## Getting Started
 
 ### Prerequisites
@@ -80,14 +82,14 @@ pnpm dev
 
 ```bash
 pnpm build
-# Output is written to extension/dist
+# Output is written to dist
 ```
 
 ### Load the extension in Chrome
 
 1. Go to chrome://extensions
 2. Turn on “Developer mode”
-3. Click “Load unpacked” and select the `extension/dist` folder
+3. Click “Load unpacked” and select the `dist` folder
 4. Pin “Beveled” to your toolbar and open the popup
 
 ### Preview the web app (production build)
@@ -112,6 +114,28 @@ pnpm lint      # Run eslint
 - The editor renders everything client‑side (no server), including shadows and window chrome, then exports a final PNG/JPEG.
 - The web app routes between a home page (upload/CTA), the editor, and legal pages.
 
+## Deploying the Web App (Vercel)
+
+Connect this repository to Vercel. Use these settings:
+
+- Framework preset: Vite
+- Install command: `pnpm i --frozen-lockfile`
+- Build command: `pnpm build`
+- Output directory: `dist`
+
+Add `vercel.json` at the repo root to support SPA routes:
+
+```json
+{
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/.*", "dest": "/index.html" }
+  ]
+}
+```
+
+Note: Vercel builds from the repository root.
+
 ## Contributing
 
 Contributions are welcome! If you’d like to help:
@@ -124,8 +148,10 @@ Contributions are welcome! If you’d like to help:
 
 ## License
 
-MIT — see `LICENSE` (please add one if not present). You’re free to use, modify, and distribute with attribution.
+MIT — see `LICENSE`.
 
 ---
 
 Made with ❤️ to help you make your screenshots better.
+
+
