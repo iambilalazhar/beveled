@@ -1,5 +1,11 @@
 // Content script for advanced screenshot capture functionality
 
+declare global {
+  interface Window {
+    __screenshotCleanup?: () => void
+  }
+}
+
 interface FullPageCaptureResult {
   dataUrl: string
   width: number
@@ -54,7 +60,6 @@ export async function captureFullPage(): Promise<FullPageCaptureResult> {
       canvas.width = fullWidth
       canvas.height = fullHeight
       
-      let segmentsCaptured = 0
       const totalSegments = verticalSegments * horizontalSegments
       
       // Function to capture a single segment
@@ -64,27 +69,29 @@ export async function captureFullPage(): Promise<FullPageCaptureResult> {
           window.scrollTo(x, y)
           
           // Wait for scroll and any lazy loading
-          setTimeout(() => {
-            // Send message to background script to capture visible area
-            chrome.runtime.sendMessage(
-              { type: 'CAPTURE_VISIBLE_SEGMENT' },
-              (response) => {
+          const attemptCapture = (retryCount = 0) => {
+            window.scrollTo(x, y)
+            setTimeout(() => {
+              chrome.runtime.sendMessage({ type: 'CAPTURE_VISIBLE_SEGMENT' }, (response) => {
                 if (response?.dataUrl) {
                   const img = new Image()
                   img.onload = () => {
-                    // Draw segment to canvas
                     ctx.drawImage(img, x, y)
-                    segmentsCaptured++
                     segmentResolve()
                   }
                   img.onerror = () => segmentReject(new Error('Failed to load segment image'))
                   img.src = response.dataUrl
+                } else if (response?.error && retryCount < 3) {
+                  // Back off if we hit capture limits
+                  attemptCapture(retryCount + 1)
                 } else {
-                  segmentReject(new Error('Failed to capture segment'))
+                  segmentReject(new Error(response?.error || 'Failed to capture segment'))
                 }
-              }
-            )
-          }, 200) // Wait for scroll and content loading
+              })
+            }, 500 + retryCount * 300)
+          }
+
+          attemptCapture()
         })
       }
       
@@ -160,7 +167,7 @@ export function simulateViewport(width: number, _height: number, deviceScaleFact
   `
   
   // Store cleanup function
-  ;(window as any).__screenshotCleanup = () => {
+  window.__screenshotCleanup = () => {
     if (originalContent) {
       viewportMeta.content = originalContent
     } else {
@@ -172,9 +179,9 @@ export function simulateViewport(width: number, _height: number, deviceScaleFact
 
 // Cleanup viewport simulation
 export function restoreViewport(): void {
-  if ((window as any).__screenshotCleanup) {
-    ;(window as any).__screenshotCleanup()
-    delete (window as any).__screenshotCleanup
+  if (window.__screenshotCleanup) {
+    window.__screenshotCleanup()
+    delete window.__screenshotCleanup
   }
 }
 

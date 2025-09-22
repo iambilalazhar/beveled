@@ -8,9 +8,6 @@ import {
   SidebarGroupLabel,
   SidebarRail,
   SidebarSeparator,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
 } from '@/components/ui/sidebar'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -21,7 +18,63 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Download } from 'lucide-react'
+
+type ShadowPreset = {
+  id: string
+  label: string
+  description: string
+  config: {
+    enabled: boolean
+    color: string
+    opacity: number
+    blur: number
+    offsetX: number
+    offsetY: number
+  }
+}
+
+const SHADOW_PRESETS: ShadowPreset[] = [
+  {
+    id: 'off',
+    label: 'No Shadow',
+    description: 'Keep things flat and minimal.',
+    config: { enabled: false, color: '#000000', opacity: 0.1, blur: 0, offsetX: 0, offsetY: 0 },
+  },
+  {
+    id: 'soft',
+    label: 'Soft Lift',
+    description: 'Feathered ambient glow ideal for UI shots.',
+    config: { enabled: true, color: '#0f172a', opacity: 0.22, blur: 40, offsetX: 0, offsetY: 22 },
+  },
+  {
+    id: 'dramatic',
+    label: 'Studio Drop',
+    description: 'Directional light with crisp edges.',
+    config: { enabled: true, color: '#0b1120', opacity: 0.28, blur: 28, offsetX: 8, offsetY: 32 },
+  },
+  {
+    id: 'glow',
+    label: 'Vivid Glow',
+    description: 'Colorful halo for marketing shots.',
+    config: { enabled: true, color: '#38bdf8', opacity: 0.35, blur: 48, offsetX: 0, offsetY: 12 },
+  },
+  {
+    id: 'long',
+    label: 'Long Shadow',
+    description: 'Stylized cinematic stretch.',
+    config: { enabled: true, color: '#0f172a', opacity: 0.2, blur: 26, offsetX: 40, offsetY: 60 },
+  },
+]
+
+const hexToRgba = (hex: string, alpha: number): string => {
+  const normalized = hex.replace('#', '')
+  const parse = (segment: string) => parseInt(segment, 16)
+  const r = normalized.length === 3 ? parse(normalized[0] + normalized[0]) : parse(normalized.slice(0, 2))
+  const g = normalized.length === 3 ? parse(normalized[1] + normalized[1]) : parse(normalized.slice(2, 4))
+  const b = normalized.length === 3 ? parse(normalized[2] + normalized[2]) : parse(normalized.slice(4, 6))
+  return `rgba(${r}, ${g}, ${b}, ${Math.min(1, Math.max(0, alpha))})`
+}
 
 export type LinearGradient = { type: 'linear'; angle: number; stops: { color: string; pos: number }[] }
 export type Solid = { type: 'solid'; color: string }
@@ -69,6 +122,8 @@ export function AppSidebar({
   targetWidth,
   setTargetWidth,
   onDownload,
+  exportSettings,
+  onChangeExportSettings,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   solidPresets: string[]
@@ -103,7 +158,52 @@ export function AppSidebar({
   targetWidth: number | null
   setTargetWidth: (v: number | null) => void
   onDownload: () => void
+  exportSettings: { format: 'png' | 'jpeg'; quality: number; scale: number }
+  onChangeExportSettings: (patch: Partial<{ format: 'png' | 'jpeg'; quality: number; scale: number }>) => void
 }) {
+  const [shadowAdvancedOpen, setShadowAdvancedOpen] = React.useState(false)
+
+  const approxEqual = React.useCallback((a: number, b: number) => Math.abs(a - b) < 0.015, [])
+
+  const activeShadowPresetId = React.useMemo(() => {
+    return SHADOW_PRESETS.find((preset) => {
+      const cfg = preset.config
+      return (
+        shadowEnabled === cfg.enabled &&
+        approxEqual(shadowOpacity, cfg.opacity) &&
+        approxEqual(shadowBlur, cfg.blur) &&
+        approxEqual(shadowOffsetX, cfg.offsetX) &&
+        approxEqual(shadowOffsetY, cfg.offsetY) &&
+        shadowColor.toLowerCase() === cfg.color.toLowerCase()
+      )
+    })?.id
+  }, [shadowEnabled, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, shadowColor, approxEqual])
+
+  const applyShadowPreset = React.useCallback((preset: ShadowPreset) => {
+    const { config } = preset
+    setShadowEnabled(config.enabled)
+    setShadowColor(config.color)
+    setShadowOpacity(config.opacity)
+    setShadowBlur(config.blur)
+    setShadowOffsetX(config.offsetX)
+    setShadowOffsetY(config.offsetY)
+  }, [setShadowBlur, setShadowColor, setShadowEnabled, setShadowOffsetX, setShadowOffsetY, setShadowOpacity])
+
+  const handleShadowToggle = React.useCallback((checked: boolean) => {
+    if (checked) {
+      const fallback = SHADOW_PRESETS.find((p) => p.id === 'soft') ?? SHADOW_PRESETS[1]
+      applyShadowPreset(fallback)
+    } else {
+      const offPreset = SHADOW_PRESETS.find((p) => p.id === 'off') ?? SHADOW_PRESETS[0]
+      applyShadowPreset(offPreset)
+    }
+  }, [applyShadowPreset])
+
+  const getPresetShadowCss = React.useCallback((preset: ShadowPreset) => {
+    if (!preset.config.enabled) return 'none'
+    const { offsetX, offsetY, blur, color, opacity } = preset.config
+    return `${offsetX}px ${offsetY}px ${blur}px ${hexToRgba(color, opacity)}`
+  }, [])
   return (
     <Sidebar {...props} variant="inset">
       <SidebarContent>
@@ -365,123 +465,172 @@ export function AppSidebar({
             <CollapsibleContent>
               <SidebarGroupContent className="space-y-4 px-4 pb-2">
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Switch checked={shadowEnabled} onCheckedChange={setShadowEnabled} id="shadow-enabled" />
-                    <Label htmlFor="shadow-enabled">Drop shadow</Label>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <Label htmlFor="shadow-enabled" className="text-sm font-medium">Drop shadow</Label>
+                      <p className="text-xs text-muted-foreground">Add depth instantly with curated looks.</p>
+                    </div>
+                    <Switch checked={shadowEnabled} onCheckedChange={handleShadowToggle} id="shadow-enabled" />
                   </div>
-                  
-                  {shadowEnabled && (
-                    <div className="space-y-4">
-                      <div className="grid grid-cols-3 gap-2">
-                        <Button
-                          variant={shadowOffsetX === 0 && shadowOffsetY === 2 && shadowBlur === 8 ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setShadowOffsetX(0)
-                            setShadowOffsetY(2)
-                            setShadowBlur(8)
-                            setShadowOpacity(0.1)
-                          }}
-                        >
-                          Subtle
-                        </Button>
-                        <Button
-                          variant={shadowOffsetX === 0 && shadowOffsetY === 4 && shadowBlur === 16 ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setShadowOffsetX(0)
-                            setShadowOffsetY(4)
-                            setShadowBlur(16)
-                            setShadowOpacity(0.15)
-                          }}
-                        >
-                          Medium
-                        </Button>
-                        <Button
-                          variant={shadowOffsetX === 0 && shadowOffsetY === 8 && shadowBlur === 24 ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setShadowOffsetX(0)
-                            setShadowOffsetY(8)
-                            setShadowBlur(24)
-                            setShadowOpacity(0.2)
-                          }}
-                        >
-                          Strong
-                        </Button>
-                      </div>
 
-                      <div className="space-y-3">
+                  <div className="grid gap-2">
+                    {SHADOW_PRESETS.map((preset) => {
+                      const isSelected = activeShadowPresetId === preset.id || (!activeShadowPresetId && !shadowEnabled && preset.id === 'off')
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          className={cn(
+                            'rounded-md border px-3 py-2 text-left transition-all hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60',
+                            isSelected ? 'border-blue-500 bg-blue-500/10' : 'border-border bg-background/60'
+                          )}
+                          onClick={() => applyShadowPreset(preset)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-16 items-center justify-center rounded-md bg-muted">
+                              <div
+                                className="h-7 w-12 rounded-md border border-border/70 bg-white"
+                                style={{ boxShadow: preset.config.enabled ? getPresetShadowCss(preset) : 'none' }}
+                              />
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium leading-none">{preset.label}</div>
+                              <p className="text-xs text-muted-foreground leading-snug mt-1">{preset.description}</p>
+                            </div>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {shadowEnabled && (
+                    <Collapsible open={shadowAdvancedOpen} onOpenChange={setShadowAdvancedOpen} className="pt-1">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <span>Fine-tune shadow</span>
+                        <ChevronDown className={cn('size-4 transition-transform', shadowAdvancedOpen ? 'rotate-180' : '')} />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="space-y-3 pt-3">
                         <div className="grid grid-cols-2 gap-3 items-center">
                           <Label>Color</Label>
-                          <input 
-                            type="color" 
-                            value={shadowColor} 
+                          <input
+                            type="color"
+                            value={shadowColor}
                             onChange={(e) => setShadowColor(e.target.value)}
-                            className="w-full h-8 rounded border cursor-pointer"
+                            className="h-8 w-full cursor-pointer rounded border"
                           />
                         </div>
-                        
                         <div className="space-y-1.5">
                           <Label>Opacity: {Math.round(shadowOpacity * 100)}%</Label>
-                          <Slider 
-                            min={0} 
-                            max={100} 
-                            step={1} 
-                            value={[Math.round(shadowOpacity * 100)]} 
-                            onValueChange={(v) => setShadowOpacity((v[0] ?? 0) / 100)} 
+                          <Slider
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={[Math.round(shadowOpacity * 100)]}
+                            onValueChange={(v) => setShadowOpacity((v[0] ?? 0) / 100)}
                           />
                         </div>
-                        
                         <div className="space-y-1.5">
                           <Label>Blur: {shadowBlur}px</Label>
-                          <Slider 
-                            min={0} 
-                            max={48} 
-                            step={1} 
-                            value={[shadowBlur]} 
-                            onValueChange={(v) => setShadowBlur(v[0] ?? shadowBlur)} 
+                          <Slider
+                            min={0}
+                            max={96}
+                            step={1}
+                            value={[shadowBlur]}
+                            onValueChange={(v) => setShadowBlur(v[0] ?? shadowBlur)}
                           />
                         </div>
-                        
                         <div className="space-y-1.5">
                           <Label>Offset X: {shadowOffsetX}px</Label>
-                          <Slider 
-                            min={-32} 
-                            max={32} 
-                            step={1} 
-                            value={[shadowOffsetX]} 
-                            onValueChange={(v) => setShadowOffsetX(v[0] ?? shadowOffsetX)} 
+                          <Slider
+                            min={-80}
+                            max={80}
+                            step={1}
+                            value={[shadowOffsetX]}
+                            onValueChange={(v) => setShadowOffsetX(v[0] ?? shadowOffsetX)}
                           />
                         </div>
-                        
                         <div className="space-y-1.5">
                           <Label>Offset Y: {shadowOffsetY}px</Label>
-                          <Slider 
-                            min={-32} 
-                            max={32} 
-                            step={1} 
-                            value={[shadowOffsetY]} 
-                            onValueChange={(v) => setShadowOffsetY(v[0] ?? shadowOffsetY)} 
+                          <Slider
+                            min={-80}
+                            max={80}
+                            step={1}
+                            value={[shadowOffsetY]}
+                            onValueChange={(v) => setShadowOffsetY(v[0] ?? shadowOffsetY)}
                           />
                         </div>
-                      </div>
-                    </div>
+                      </CollapsibleContent>
+                    </Collapsible>
                   )}
                 </div>
               </SidebarGroupContent>
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
+        <SidebarSeparator />
+        <Collapsible className="group/collapsible">
+          <SidebarGroup>
+            <SidebarGroupLabel asChild>
+              <CollapsibleTrigger className="px-4 py-2 text-sm font-medium flex items-center">
+                Export
+                <ChevronDown className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-180" />
+              </CollapsibleTrigger>
+            </SidebarGroupLabel>
+            <CollapsibleContent>
+              <SidebarGroupContent className="space-y-4 px-4 pb-2">
+                <div className="space-y-2">
+                  <Label>Format</Label>
+                  <Select value={exportSettings.format} onValueChange={(value) => onChangeExportSettings({ format: value as 'png' | 'jpeg' })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="png">PNG (lossless)</SelectItem>
+                      <SelectItem value="jpeg">JPEG</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {exportSettings.format === 'jpeg' && (
+                  <div className="space-y-2">
+                    <Label>Quality: {Math.round(exportSettings.quality * 100)}%</Label>
+                    <Slider
+                      min={60}
+                      max={100}
+                      step={1}
+                      value={[Math.round(exportSettings.quality * 100)]}
+                      onValueChange={(v) => onChangeExportSettings({ quality: (v[0] ?? Math.round(exportSettings.quality * 100)) / 100 })}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label>Scale</Label>
+                  <Select value={exportSettings.scale.toString()} onValueChange={(value) => onChangeExportSettings({ scale: Number(value) || 1 })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">1× (preview size)</SelectItem>
+                      <SelectItem value="1.5">1.5×</SelectItem>
+                      <SelectItem value="2">2×</SelectItem>
+                      <SelectItem value="3">3×</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Exports at a higher resolution without modifying the canvas preview.</p>
+                </div>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={onDownload} className="justify-center">
-              Download
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+      <SidebarFooter className="p-4">
+        <Button 
+          onClick={onDownload} 
+          size="lg" 
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
+        >
+          <Download className="w-4 h-4" />
+          Download Screenshot
+        </Button>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

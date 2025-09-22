@@ -157,7 +157,7 @@ export function renderComposition(
       ctx.direction = 'ltr' as CanvasDirection
       ctx.textAlign = t.align
       ctx.textBaseline = 'top'
-      const isContentAnchored = (t as any).positionAnchor !== 'stage'
+      const isContentAnchored = (t.positionAnchor ?? 'content') === 'content'
       const tx = (isContentAnchored ? contentX : 0) + t.x
       let y = (isContentAnchored ? contentY : 0) + t.y
       const lines = t.text.split(/\n/)
@@ -213,8 +213,8 @@ export function renderComposition(
         const alpha = Math.min(1, Math.max(0, t.shadowAlpha ?? 0.5))
         ctx.shadowColor = hexToRgba(t.shadowColor || '#000000', alpha)
         ctx.shadowBlur = Math.max(0, t.shadowBlur ?? 8)
-        ctx.shadowOffsetX = Math.max(0, t.shadowOffsetX ?? 0)
-        ctx.shadowOffsetY = Math.max(0, t.shadowOffsetY ?? 2)
+        ctx.shadowOffsetX = t.shadowOffsetX ?? 0
+        ctx.shadowOffsetY = t.shadowOffsetY ?? 2
       }
 
       for (const line of lines) {
@@ -471,8 +471,8 @@ function fillPattern(ctx: CanvasRenderingContext2D, w: number, h: number, p: Pat
       break
     }
   }
-  const pattern = ctx.createPattern(tile, 'repeat')!
-  ctx.fillStyle = pattern as any
+  const pattern = ctx.createPattern(tile, 'repeat')
+  ctx.fillStyle = pattern ?? '#000000'
   ctx.fillRect(0, 0, w, h)
 }
 
@@ -500,8 +500,8 @@ function drawShape(ctx: CanvasRenderingContext2D, s: ShapeNode, contentX: number
     const alpha = Math.min(1, Math.max(0, s.shadowAlpha ?? 0.5))
     ctx.shadowColor = hexToRgba(s.shadowColor || '#000000', alpha)
     ctx.shadowBlur = Math.max(0, s.shadowBlur ?? 8)
-    ctx.shadowOffsetX = Math.max(0, s.shadowOffsetX ?? 0)
-    ctx.shadowOffsetY = Math.max(0, s.shadowOffsetY ?? 2)
+    ctx.shadowOffsetX = s.shadowOffsetX ?? 0
+    ctx.shadowOffsetY = s.shadowOffsetY ?? 2
   }
   ctx.lineWidth = Math.max(1, s.strokeWidth)
   ctx.strokeStyle = s.strokeColor

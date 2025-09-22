@@ -1,5 +1,8 @@
-
+import * as React from 'react'
 import type { TextNode } from './types'
+
+const TEXT_CLIP = 'text' as unknown as React.CSSProperties['backgroundClip']
+const WEBKIT_TEXT_CLIP = 'text'
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '')
@@ -124,12 +127,12 @@ export function TextOverlay({
                 fontSize: t.fontSize * scale,
                 fontWeight: t.bold ? 700 : 400,
                 fontStyle: t.italic ? 'italic' : 'normal',
-                textAlign: t.align as any,
+                textAlign: t.align,
                 WebkitTextStroke: t.outline ? `${Math.max(0, t.outlineWidth * scale)}px ${t.outlineColor}` : undefined,
                 color: (t.fillType ?? 'solid') === 'solid' ? t.color : undefined,
                 backgroundImage: (t.fillType ?? 'solid') === 'linear' ? `linear-gradient(${t.backgroundAngle ?? 0}deg, ${t.color}, ${t.fillColor2 ?? t.color})` : undefined,
-                WebkitBackgroundClip: (t.fillType ?? 'solid') === 'linear' ? 'text' as any : undefined,
-                backgroundClip: (t.fillType ?? 'solid') === 'linear' ? 'text' as any : undefined,
+                WebkitBackgroundClip: (t.fillType ?? 'solid') === 'linear' ? WEBKIT_TEXT_CLIP : undefined,
+                backgroundClip: (t.fillType ?? 'solid') === 'linear' ? TEXT_CLIP : undefined,
                 WebkitTextFillColor: (t.fillType ?? 'solid') === 'linear' ? 'transparent' : undefined,
                 textShadow: t.shadow && !t.background ? `${t.shadowOffsetX ?? 0}px ${t.shadowOffsetY ?? 2}px ${t.shadowBlur ?? 8}px ${shadowCol}` : undefined,
                 whiteSpace: 'pre',

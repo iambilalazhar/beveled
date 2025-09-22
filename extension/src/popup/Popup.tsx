@@ -111,8 +111,9 @@ export default function Popup() {
         options: captureOptions
       })
       if (!res?.ok) throw new Error(res?.error || 'Unknown error')
-    } catch (e: any) {
-      setError(e?.message ?? String(e))
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -126,9 +127,10 @@ export default function Popup() {
         return 'Capture Visible Area'
       case 'fullpage':
         return 'Capture Full Page'
-      case 'viewport':
+      case 'viewport': {
         const preset = VIEWPORT_PRESETS[selectedPreset]
         return `Capture ${preset.name.split(' (')[0]}`
+      }
       default:
         return 'Capture Screenshot'
     }
@@ -231,7 +233,7 @@ export default function Popup() {
 
           <div className="space-y-2">
             <p className="text-[11px] text-muted-foreground font-medium">Quick Actions</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <Button 
                 variant="outline" 
                 size="sm" 
@@ -251,6 +253,16 @@ export default function Popup() {
               >
                 <Tablet className="size-3 mr-1" />
                 Tablet
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCapture({ type: 'viewport', viewport: { width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false } })}
+                disabled={loading}
+                className="text-xs"
+              >
+                <Monitor className="size-3 mr-1" />
+                Desktop
               </Button>
             </div>
           </div>

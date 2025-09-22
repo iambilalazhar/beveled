@@ -76,22 +76,197 @@ export const VIEWPORT_PRESETS: Record<string, ViewportPreset> = {
   }
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === 'CAPTURE_SCREENSHOT') {
     const options: CaptureOptions = message.options || { type: 'visible' }
-    captureAndOpenEditor(options).then(() => sendResponse({ ok: true })).catch((err) => {
-      console.error('Capture failed', err)
-      sendResponse({ ok: false, error: String(err) })
-    })
+    captureAndOpenEditor(options, sender)
+      .then(() => sendResponse({ ok: true }))
+      .catch((err) => {
+        console.error('Capture failed', err)
+        sendResponse({ ok: false, error: String(err) })
+      })
     // Keep the message channel open for async response
+    return true
+  }
+
+  if (message?.type === 'CAPTURE_VISIBLE_SEGMENT') {
+    const tab = sender.tab
+    if (!tab) {
+      sendResponse({ error: 'No tab context for segment capture' })
+      return
+    }
+
+    focusTab(tab)
+      .catch(() => undefined)
+      .then(() => captureVisibleArea(tab))
+      .then((dataUrl) => sendResponse({ dataUrl }))
+      .catch((error) => {
+        console.error('Segment capture failed', error)
+        sendResponse({ error: String(error) })
+      })
+
     return true
   }
 })
 
-async function captureVisibleArea(): Promise<string> {
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+const CAPTURE_MIN_INTERVAL_MS = 700
+let lastCaptureTimestamp = 0
+
+function isRestrictedUrl(url: string | undefined): boolean {
+  if (!url) return false
+  return (
+    url.startsWith('chrome://') ||
+    url.startsWith('edge://') ||
+    url.startsWith('about:') ||
+    url.startsWith('chrome-extension://')
+  )
+}
+
+async function focusTab(tab: chrome.tabs.Tab): Promise<void> {
+  if (tab.windowId !== undefined) {
+    await new Promise<void>((resolve, reject) => {
+      chrome.windows.update(tab.windowId!, { focused: true }, () => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError)
+          return
+        }
+        resolve()
+      })
+    })
+  }
+
+  if (tab.id === undefined || tab.active) return
+
+  await new Promise<void>((resolve, reject) => {
+    chrome.tabs.update(tab.id!, { active: true }, () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+        return
+      }
+      resolve()
+    })
+  })
+}
+
+function isNormalCapturableTab(tab: chrome.tabs.Tab | undefined | null): tab is chrome.tabs.Tab {
+  return !!tab && tab.id !== undefined && tab.windowId !== undefined && !isRestrictedUrl(tab.url)
+}
+
+async function getCaptureTab(sender?: chrome.runtime.MessageSender): Promise<chrome.tabs.Tab> {
+  const senderTab = sender?.tab
+  if (isNormalCapturableTab(senderTab)) {
+    try {
+      await focusTab(senderTab)
+      await sleep(120)
+      return senderTab
+    } catch (error) {
+      console.warn('Failed to focus sender tab for capture:', error)
+    }
+  }
+
+  const activeTabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true, windowType: 'normal' })
+  const activeCandidate = activeTabs.find(isNormalCapturableTab)
+  if (activeCandidate) {
+    await focusTab(activeCandidate)
+    await sleep(150)
+    return activeCandidate
+  }
+
+  const windows = await chrome.windows.getAll({ populate: true, windowTypes: ['normal'] })
+  const sorted = windows
+    .flatMap((win) => win.tabs ?? [])
+    .filter(isNormalCapturableTab)
+    .sort((a, b) => (b.lastAccessed ?? 0) - (a.lastAccessed ?? 0))
+
+  const target = sorted[0]
+  if (!target) {
+    throw new Error('No capturable browser tab detected. Focus the page you want to capture and try again.')
+  }
+
+  await focusTab(target)
+  await sleep(150)
+  return target
+}
+
+async function ensureContentScript(tabId: number): Promise<void> {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    files: ['content-script.js']
+  })
+}
+
+function sendMessageToTab<T = unknown>(tabId: number, message: unknown): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+        return
+      }
+      resolve(response as T)
+    })
+  })
+}
+
+async function attachDebugger(tabId: number): Promise<chrome.debugger.Debuggee> {
+  const debuggee: chrome.debugger.Debuggee = { tabId }
+
+  await new Promise<void>((resolve, reject) => {
+    chrome.debugger.attach(debuggee, '1.3', () => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+        return
+      }
+      resolve()
+    })
+  })
+
+  return debuggee
+}
+
+function sendDebuggerCommand<T = unknown>(
+  debuggee: chrome.debugger.Debuggee,
+  method: string,
+  params?: Record<string, unknown>
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    chrome.debugger.sendCommand(debuggee, method, params, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError)
+        return
+      }
+      resolve(result as T)
+    })
+  })
+}
+
+async function detachDebugger(debuggee: chrome.debugger.Debuggee): Promise<void> {
+  await new Promise<void>((resolve) => {
+    chrome.debugger.detach(debuggee, () => resolve())
+  })
+}
+
+async function evalInPage(debuggee: chrome.debugger.Debuggee, expression: string): Promise<void> {
+  try {
+    await sendDebuggerCommand(debuggee, 'Runtime.evaluate', {
+      expression,
+      awaitPromise: false,
+      returnByValue: false,
+    })
+  } catch (error) {
+    console.warn('Runtime evaluation failed', error)
+  }
+}
+
+async function captureVisibleArea(tab: chrome.tabs.Tab): Promise<string> {
+  const elapsed = Date.now() - lastCaptureTimestamp
+  if (elapsed < CAPTURE_MIN_INTERVAL_MS) {
+    await sleep(CAPTURE_MIN_INTERVAL_MS - elapsed)
+  }
   return new Promise<string>((resolve, reject) => {
     try {
-      chrome.tabs.captureVisibleTab({ format: 'png' }, (dataUrl) => {
+      const windowId = tab.windowId ?? chrome.windows.WINDOW_ID_CURRENT
+      chrome.tabs.captureVisibleTab(windowId, { format: 'png' }, (dataUrl) => {
         if (chrome.runtime.lastError) {
           reject(chrome.runtime.lastError.message)
           return
@@ -101,6 +276,7 @@ async function captureVisibleArea(): Promise<string> {
           return
         }
         resolve(dataUrl)
+        lastCaptureTimestamp = Date.now()
       })
     } catch (e) {
       reject(e)
@@ -108,194 +284,168 @@ async function captureVisibleArea(): Promise<string> {
   })
 }
 
-async function captureFullPage(): Promise<string> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+async function captureFullPage(tab: chrome.tabs.Tab): Promise<string> {
   if (!tab.id) throw new Error('No active tab found')
 
   try {
-    // Inject content script if not already present
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ['content-script.js']
-    })
+    await ensureContentScript(tab.id)
 
-    // Get page dimensions first
-    const dimensionsResult = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        const body = document.body
-        const html = document.documentElement
-        
-        return {
-          fullHeight: Math.max(
-            body.scrollHeight,
-            body.offsetHeight,
-            html.clientHeight,
-            html.scrollHeight,
-            html.offsetHeight
-          ),
-          fullWidth: Math.max(
-            body.scrollWidth,
-            body.offsetWidth,
-            html.clientWidth,
-            html.scrollWidth,
-            html.offsetWidth
-          ),
-          viewportHeight: window.innerHeight,
-          viewportWidth: window.innerWidth,
-          originalScrollX: window.scrollX,
-          originalScrollY: window.scrollY
-        }
-      }
-    })
-
-    if (!dimensionsResult[0]?.result) {
-      throw new Error('Failed to get page dimensions')
+    const response = await sendMessageToTab<{ success: boolean; error?: string; result?: { dataUrl?: string } }>(
+      tab.id,
+      { type: 'CAPTURE_FULL_PAGE' }
+    )
+    if (!response?.success) {
+      throw new Error(response?.error || 'Full page capture failed')
     }
 
-    const { fullHeight, fullWidth, viewportHeight, viewportWidth, originalScrollX, originalScrollY } = dimensionsResult[0].result
-
-    // Create canvas for stitching segments
-    const canvas = document.createElement('canvas')
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Could not create canvas context')
-
-    canvas.width = fullWidth
-    canvas.height = fullHeight
-
-    // Calculate segments needed
-    const verticalSegments = Math.ceil(fullHeight / viewportHeight)
-    const horizontalSegments = Math.ceil(fullWidth / viewportWidth)
-
-    // Capture segments
-    for (let row = 0; row < verticalSegments; row++) {
-      for (let col = 0; col < horizontalSegments; col++) {
-        const x = col * viewportWidth
-        const y = row * viewportHeight
-
-        // Scroll to position
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: (scrollX: number, scrollY: number) => {
-            window.scrollTo(scrollX, scrollY)
-            return new Promise(resolve => setTimeout(resolve, 300)) // Wait for scroll
-          },
-          args: [x, y]
-        })
-
-        // Capture visible area
-        const segmentDataUrl = await captureVisibleArea()
-        
-        // Draw segment to canvas
-        const img = new Image()
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => {
-            ctx.drawImage(img, x, y)
-            resolve()
-          }
-          img.onerror = () => reject(new Error('Failed to load segment'))
-          img.src = segmentDataUrl
-        })
-      }
+    const dataUrl = response.result?.dataUrl
+    if (!dataUrl) {
+      throw new Error('No capture data returned from full page capture')
     }
 
-    // Restore original scroll position
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (scrollX: number, scrollY: number) => {
-        window.scrollTo(scrollX, scrollY)
-      },
-      args: [originalScrollX, originalScrollY]
-    })
-
-    // Return final stitched image
-    return canvas.toDataURL('image/png')
-
+    return dataUrl
   } catch (error) {
     console.error('Full page capture failed:', error)
-    // Fallback to visible area
-    return await captureVisibleArea()
+    return await captureVisibleArea(tab)
   }
 }
 
-async function captureWithViewport(viewport: ViewportPreset): Promise<string> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+async function captureWithViewport(tab: chrome.tabs.Tab, viewport: ViewportPreset): Promise<string> {
   if (!tab.id) throw new Error('No active tab found')
 
-  // Store original viewport
-  const originalViewport = await chrome.scripting.executeScript({
-    target: { tabId: tab.id },
-    func: () => ({
-      width: window.innerWidth,
-      height: window.innerHeight,
-      userAgent: navigator.userAgent
-    })
-  })
+  let debuggee: chrome.debugger.Debuggee | null = null
+  const scrollStyleId = '__good_screenshots_scroll_lock'
 
   try {
-    // Set viewport size using debugger API (requires additional permissions)
-    // For now, we'll use a content script approach
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: (vp: ViewportPreset) => {
-        // Simulate viewport change
-        const meta = document.querySelector('meta[name="viewport"]') || document.createElement('meta')
-        meta.setAttribute('name', 'viewport')
-        meta.setAttribute('content', `width=${vp.width}, initial-scale=${1/vp.deviceScaleFactor}`)
-        if (!document.querySelector('meta[name="viewport"]')) {
-          document.head.appendChild(meta)
-        }
+    debuggee = await attachDebugger(tab.id)
 
-        // Add CSS to simulate device dimensions
-        const style = document.createElement('style')
-        style.textContent = `
-          html, body {
-            width: ${vp.width}px !important;
-            max-width: ${vp.width}px !important;
-          }
-        `
-        document.head.appendChild(style)
+    await sendDebuggerCommand(debuggee, 'Page.enable')
 
-        // Wait for layout to update
-        return new Promise(resolve => setTimeout(resolve, 500))
-      },
-      args: [viewport]
+    if (viewport.userAgent) {
+      await sendDebuggerCommand(debuggee, 'Emulation.setUserAgentOverride', {
+        userAgent: viewport.userAgent
+      })
+    }
+
+    await sendDebuggerCommand(debuggee, 'Emulation.setDeviceMetricsOverride', {
+      width: viewport.width,
+      height: viewport.height,
+      deviceScaleFactor: viewport.deviceScaleFactor,
+      mobile: viewport.isMobile,
+      screenWidth: viewport.width,
+      screenHeight: viewport.height,
+      positionX: 0,
+      positionY: 0,
+      screenOrientation:
+        viewport.width > viewport.height
+          ? { type: 'landscapePrimary', angle: 90 }
+          : { type: 'portraitPrimary', angle: 0 }
     })
 
-    // Capture after viewport change
-    const dataUrl = await captureVisibleArea()
-    return dataUrl
+    await sendDebuggerCommand(debuggee, 'Emulation.setVisibleSize', {
+      width: viewport.width,
+      height: viewport.height,
+    }).catch(() => undefined)
 
-  } finally {
-    // Restore original viewport (cleanup)
-    if (originalViewport[0]?.result) {
-      await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          // Remove our injected styles
-          const injectedStyles = document.querySelectorAll('style')
-          injectedStyles.forEach(style => {
-            if (style.textContent?.includes('max-width') && style.textContent?.includes('!important')) {
-              style.remove()
-            }
-          })
-        }
+    await sendDebuggerCommand(debuggee, 'Emulation.forceViewport', {
+      x: 0,
+      y: 0,
+      scale: 1,
+    }).catch(() => undefined)
+
+    if (viewport.isMobile) {
+      await sendDebuggerCommand(debuggee, 'Emulation.setTouchEmulationEnabled', {
+        enabled: true
       })
+    }
+
+    await focusTab(tab)
+    await sleep(400)
+
+    await evalInPage(debuggee, 'window.scrollTo({ top: 0, left: 0, behavior: "instant" })')
+    await evalInPage(debuggee, `(() => {
+      const id = '${scrollStyleId}';
+      if (document.getElementById(id)) return;
+      const style = document.createElement('style');
+      style.id = id;
+      style.textContent = 'html,body{overflow:hidden!important;overscroll-behavior:none!important;}::-webkit-scrollbar{display:none!important;}';
+      document.head.appendChild(style);
+    })();`)
+    await evalInPage(debuggee, 'window.dispatchEvent(new Event("resize"))')
+    await sleep(220)
+
+    const layoutMetrics = await sendDebuggerCommand<{
+      contentSize: { width: number; height: number }
+      layoutViewport: { clientWidth: number; clientHeight: number }
+    }>(debuggee, 'Page.getLayoutMetrics')
+
+    const clipWidth = Math.max(1, Math.min(viewport.width, Math.floor(layoutMetrics.layoutViewport.clientWidth || viewport.width)))
+    const contentHeight = Math.floor(layoutMetrics.contentSize.height || viewport.height)
+    const clipHeight = Math.max(1, Math.min(contentHeight, viewport.height))
+
+    const screenshot = await sendDebuggerCommand<{ data: string }>(debuggee, 'Page.captureScreenshot', {
+      format: 'png',
+      quality: 100,
+      fromSurface: true,
+      captureBeyondViewport: clipHeight > viewport.height,
+      clip: {
+        x: 0,
+        y: 0,
+        width: clipWidth,
+        height: clipHeight,
+        scale: 1
+      }
+    })
+
+    return `data:image/png;base64,${screenshot.data}`
+  } finally {
+    if (debuggee) {
+      try {
+        await sendDebuggerCommand(debuggee, 'Emulation.clearDeviceMetricsOverride')
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      if (viewport.isMobile) {
+        try {
+          await sendDebuggerCommand(debuggee, 'Emulation.setTouchEmulationEnabled', { enabled: false })
+        } catch {
+          // Ignore cleanup errors
+        }
+      }
+
+      try {
+        await evalInPage(debuggee, `(() => {
+          const style = document.getElementById('${scrollStyleId}');
+          if (style) style.remove();
+        })();`)
+      } catch {
+        // Ignore cleanup errors
+      }
+
+      try {
+        await detachDebugger(debuggee)
+      } catch {
+        // Ignore detach errors
+      }
     }
   }
 }
 
-async function captureAndOpenEditor(options: CaptureOptions = { type: 'visible' }) {
+async function captureAndOpenEditor(options: CaptureOptions = { type: 'visible' }, sender?: chrome.runtime.MessageSender) {
+  const tab = await getCaptureTab(sender)
+  if (!tab.id) throw new Error('Active tab is not capturable')
+
   let dataUrl: string
 
   switch (options.type) {
     case 'visible':
-      dataUrl = await captureVisibleArea()
+      dataUrl = await captureVisibleArea(tab)
       break
     case 'fullpage':
-      dataUrl = await captureFullPage()
+      dataUrl = await captureFullPage(tab)
       break
-    case 'viewport':
+    case 'viewport': {
       if (!options.viewport) {
         throw new Error('Viewport options required for viewport capture')
       }
@@ -306,8 +456,9 @@ async function captureAndOpenEditor(options: CaptureOptions = { type: 'visible' 
         deviceScaleFactor: options.viewport.deviceScaleFactor || 1,
         isMobile: options.viewport.isMobile || false
       }
-      dataUrl = await captureWithViewport(preset)
+      dataUrl = await captureWithViewport(tab, preset)
       break
+    }
     default:
       throw new Error(`Unsupported capture type: ${options.type}`)
   }

@@ -182,8 +182,8 @@ export function ShapesOverlay({
                     const sw = s.w
                     const sh = s.h
                     const move = (ev: PointerEvent) => {
-                      let dx = (ev.clientX - startX) / scale
-                      let dy = (ev.clientY - startY) / scale
+                      const dx = (ev.clientX - startX) / scale
+                      const dy = (ev.clientY - startY) / scale
                       let nx = sx
                       let ny = sy
                       let nw = sw

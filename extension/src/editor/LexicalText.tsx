@@ -45,7 +45,6 @@ export default function LexicalText({ value, onChange, className, style, placeho
     namespace: 'OverlayTextEditor',
     onError(error: unknown) {
       // Bubble up but avoid crashing the whole app
-      // eslint-disable-next-line no-console
       console.error(error)
     },
     // Keep default theme minimal; styles are applied via ContentEditable props
@@ -75,7 +74,7 @@ export default function LexicalText({ value, onChange, className, style, placeho
       <OnChangePlugin
         onChange={(editorState) => {
           editorState.read(() => {
-            let text = $getRoot().getTextContent()
+            const text = $getRoot().getTextContent()
             if (singleLine) {
               // Normalize any accidental newlines into single spaces
               const normalized = text.replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim()
@@ -93,5 +92,3 @@ export default function LexicalText({ value, onChange, className, style, placeho
     </LexicalComposer>
   )
 }
-
-

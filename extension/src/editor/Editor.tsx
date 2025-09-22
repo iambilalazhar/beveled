@@ -26,14 +26,27 @@ export default function Editor() {
     '#1d4ed8', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#f472b6', '#00000000'
   ]
   const GRADIENT_PRESETS: LinearGradient[] = [
-    { type: 'linear', angle: 135, stops: [ { color: '#4f46e5', pos: 0 }, { color: '#06b6d4', pos: 1 } ] }, // Indigo → Cyan
-    { type: 'linear', angle: 135, stops: [ { color: '#8b5cf6', pos: 0 }, { color: '#ec4899', pos: 1 } ] }, // Purple → Pink
-    { type: 'linear', angle: 135, stops: [ { color: '#60a5fa', pos: 0 }, { color: '#4f46e5', pos: 1 } ] }, // Blue → Indigo
-    { type: 'linear', angle: 135, stops: [ { color: '#10b981', pos: 0 }, { color: '#14b8a6', pos: 1 } ] }, // Emerald → Teal
-    { type: 'linear', angle: 135, stops: [ { color: '#f59e0b', pos: 0 }, { color: '#f43f5e', pos: 1 } ] }, // Amber → Rose
-    { type: 'linear', angle: 135, stops: [ { color: '#0f172a', pos: 0 }, { color: '#111827', pos: 1 } ] }, // Dark Subtle
-    { type: 'linear', angle: 135, stops: [ { color: '#38bdf8', pos: 0 }, { color: '#7c3aed', pos: 1 } ] }, // Sky → Violet
-    { type: 'linear', angle: 135, stops: [ { color: '#f43f5e', pos: 0 }, { color: '#d946ef', pos: 1 } ] }, // Rose → Fuchsia
+    // Modern Tech Gradients
+    { type: 'linear', angle: 135, stops: [ { color: '#667eea', pos: 0 }, { color: '#764ba2', pos: 1 } ] }, // Cosmic Purple
+    { type: 'linear', angle: 120, stops: [ { color: '#f093fb', pos: 0 }, { color: '#f5576c', pos: 1 } ] }, // Pink Flamingo
+    { type: 'linear', angle: 45, stops: [ { color: '#4facfe', pos: 0 }, { color: '#00f2fe', pos: 1 } ] }, // Ocean Blue
+    
+    // Warm & Professional
+    { type: 'linear', angle: 135, stops: [ { color: '#fa709a', pos: 0 }, { color: '#fee140', pos: 1 } ] }, // Sunset Glow
+    { type: 'linear', angle: 90, stops: [ { color: '#ff9a9e', pos: 0 }, { color: '#fecfef', pos: 1 } ] }, // Soft Pink
+    { type: 'linear', angle: 135, stops: [ { color: '#a8edea', pos: 0 }, { color: '#fed6e3', pos: 1 } ] }, // Mint to Rose
+    
+    // Bold & Dynamic
+    { type: 'linear', angle: 45, stops: [ { color: '#d299c2', pos: 0 }, { color: '#fef9d7', pos: 1 } ] }, // Lavender Dream
+    { type: 'linear', angle: 135, stops: [ { color: '#89f7fe', pos: 0 }, { color: '#66a6ff', pos: 1 } ] }, // Sky Gradient
+    
+    // Dark & Sophisticated
+    { type: 'linear', angle: 135, stops: [ { color: '#2c3e50', pos: 0 }, { color: '#4a6741', pos: 1 } ] }, // Dark Forest
+    { type: 'linear', angle: 90, stops: [ { color: '#232526', pos: 0 }, { color: '#414345', pos: 1 } ] }, // Charcoal
+    
+    // Vibrant & Creative
+    { type: 'linear', angle: 135, stops: [ { color: '#ff6b6b', pos: 0 }, { color: '#feca57', pos: 1 } ] }, // Coral Sunset
+    { type: 'linear', angle: 45, stops: [ { color: '#48c6ef', pos: 0 }, { color: '#6f86d6', pos: 1 } ] }, // Electric Blue
   ]
 
   const [bgPreset, setBgPreset] = useState<BgPreset>({ type: 'solid', color: '#ffffff' })
@@ -79,9 +92,8 @@ export default function Editor() {
   const [snapToGrid, setSnapToGrid] = useState(false)
   const [contentLayout, setContentLayout] = useState<LayoutInfo | null>(null)
   const didAutoFitRef = useRef(false)
-  // Preview optimization: draw texts via overlay only to avoid duplication. Draw to canvas only when exporting.
-  const [showCanvasTexts, setShowCanvasTexts] = useState(false)
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
+  const [exportSettings, setExportSettings] = useState<{ format: 'png' | 'jpeg'; quality: number; scale: number }>({ format: 'png', quality: 0.92, scale: 1 })
   // Preserve canvas size for layout; do not change on scale/targetWidth
   // (declared above)
 
@@ -143,8 +155,8 @@ export default function Editor() {
     // Constrain preview to fit inside content with margins
     const edgeMargin = 80
     const maxPreviewW = Math.max(200, BASE_CONTENT_WIDTH - edgeMargin * 2)
-    let scaledW = Math.min(scaledW0, maxPreviewW)
-    let scaledH = Math.max(1, Math.round(scaledH0 * (scaledW / scaledW0)))
+    const scaledW = Math.min(scaledW0, maxPreviewW)
+    const scaledH = Math.max(1, Math.round(scaledH0 * (scaledW / scaledW0)))
 
     // Prepare text nodes and auto-avoid overlaps for stage-anchored tag/title/subtitle
     const preparedTexts = (t.texts ?? []).map((tx) => {
@@ -325,8 +337,15 @@ export default function Editor() {
     const scaledH = Math.round(srcH * scale)
 
     const extraTop = showWindow ? windowBar : 0
-    // Fixed canvas width baseline (keeps UI consistent), height follows ORIGINAL image aspect only
-    const BASE_CONTENT_WIDTH = 1280
+    const stageHasOverlays = texts.some(t => (t.positionAnchor ?? 'content') === 'stage')
+      || shapes.some(s => (s.positionAnchor ?? 'content') === 'stage')
+    const baseWidth = stageHasOverlays ? BASE_CONTENT_WIDTH : Math.max(1, scaledW)
+    const baseHeight = stageHasOverlays
+      ? Math.round(srcH * (BASE_CONTENT_WIDTH / Math.max(1, srcW)))
+      : Math.max(1, scaledH)
+    const baseTotalW = Math.max(1, Math.round(baseWidth + padding.x * 2))
+    const baseTotalH = Math.max(1, Math.round(baseHeight + padding.y * 2 + extraTop))
+
     const layoutKey = JSON.stringify({
       sw: showWindow,
       ws: windowStyle,
@@ -336,13 +355,12 @@ export default function Editor() {
       py: padding.y,
       iw: srcW,
       ih: srcH,
+      tw: targetWidth ?? null,
+      is: imageScale,
+      ov: stageHasOverlays,
     })
     if (!baseSizeRef.current || layoutKeyRef.current !== layoutKey) {
-      const baseScaledW = BASE_CONTENT_WIDTH
-      const baseScaledH = Math.round(srcH * (BASE_CONTENT_WIDTH / Math.max(1, srcW)))
-      const baseTotalW = baseScaledW + padding.x * 2
-      const baseTotalH = baseScaledH + padding.y * 2 + extraTop
-      baseSizeRef.current = { w: Math.max(1, baseTotalW), h: Math.max(1, baseTotalH) }
+      baseSizeRef.current = { w: baseTotalW, h: baseTotalH }
       layoutKeyRef.current = layoutKey
     }
     // HiDPI setup: size the backing store to device pixels, draw in CSS pixels
@@ -392,7 +410,7 @@ export default function Editor() {
       offsetX: imageOffset.x,
       offsetY: imageOffset.y,
       shapes,
-      texts: showCanvasTexts ? texts.map(t => ({ ...t })) : undefined,
+      texts: undefined,
     })
     setContentLayout(layout)
 
@@ -409,7 +427,7 @@ export default function Editor() {
         top: cRect.top - sRect.top + imgBottom,
       })
     })
-  }, [img, bgPreset, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes, showCanvasTexts])
+  }, [img, bgPreset, padding, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, windowBar, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes])
 
   // Reset image offset when a new image loads
   useEffect(() => {
@@ -422,6 +440,15 @@ export default function Editor() {
   // Global key handlers for quick editing UX
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement as HTMLElement | null
+      const isTypingContext = !!activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.isContentEditable ||
+        activeEl.getAttribute('data-editable') === 'true' ||
+        activeEl.getAttribute('role') === 'textbox'
+      )
+
       if (e.key === 'Escape') {
         // cancel current tool or clear selection
         if (activeTool === 'shape') {
@@ -430,7 +457,9 @@ export default function Editor() {
         }
         setSelectedShapeId(null)
         setSelectedTextId(null)
+        if (isTypingContext) activeEl?.blur()
       } else if ((e.key === 'Delete' || e.key === 'Backspace')) {
+        if (isTypingContext) return
         if (selectedShapeId) {
           setShapes(ss => ss.filter(s => s.id !== selectedShapeId))
           setSelectedShapeId(null)
@@ -456,19 +485,60 @@ export default function Editor() {
 
   const download = async () => {
     const c = canvasRef.current
-    if (!c) return
-    // Ensure canvas has texts drawn before export
-    setShowCanvasTexts(true)
-    requestAnimationFrame(() => {
-      c.toBlob((blob) => {
-        if (!blob) { setShowCanvasTexts(false); return }
-        const url = URL.createObjectURL(blob)
-        chrome.downloads.download({ url, filename: 'screenshot.png' })
-        setTimeout(() => URL.revokeObjectURL(url), 10_000)
-        // Restore preview mode
-        setTimeout(() => setShowCanvasTexts(false), 0)
-      })
+    if (!c || !img || !baseSizeRef.current) return
+
+    const cssW = baseSizeRef.current.w
+    const cssH = baseSizeRef.current.h
+    const multiplier = Math.max(0.5, Math.min(4, exportSettings.scale))
+    const exportCanvas = document.createElement('canvas')
+    exportCanvas.width = Math.max(1, Math.round(cssW * multiplier))
+    exportCanvas.height = Math.max(1, Math.round(cssH * multiplier))
+    const ctx = exportCanvas.getContext('2d')
+    if (!ctx) return
+    ctx.setTransform(multiplier, 0, 0, multiplier, 0, 0)
+
+    const srcW = cropRect ? cropRect.w : img.width
+    const srcH = cropRect ? cropRect.h : img.height
+    const scale = targetWidth ? Math.max(1, targetWidth) / srcW : imageScale
+    const scaledW = Math.round(srcW * scale)
+    const scaledH = Math.round(srcH * scale)
+
+    renderComposition(ctx, cssW, cssH, {
+      bgPreset,
+      padding,
+      shadowEnabled,
+      shadowColor,
+      shadowOpacity,
+      shadowBlur,
+      shadowOffsetX,
+      shadowOffsetY,
+      showWindow,
+      windowStyle,
+      windowBarColor,
+      windowBar,
+      cornerRadius,
+      image: img,
+      cropRect,
+      scaledW,
+      scaledH,
+      offsetX: imageOffset.x,
+      offsetY: imageOffset.y,
+      shapes,
+      texts: texts.map(t => ({ ...t })),
     })
+
+    const format = exportSettings.format === 'jpeg' ? 'image/jpeg' : 'image/png'
+    const quality = exportSettings.format === 'jpeg'
+      ? Math.min(1, Math.max(0.6, exportSettings.quality))
+      : undefined
+    const blob = await new Promise<Blob | null>((resolve) => {
+      exportCanvas.toBlob((val) => resolve(val), format, quality)
+    })
+    if (!blob) return
+
+    const url = URL.createObjectURL(blob)
+    chrome.downloads.download({ url, filename: `screenshot.${exportSettings.format === 'jpeg' ? 'jpg' : 'png'}` })
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
   return (
@@ -865,7 +935,7 @@ export default function Editor() {
                       const newW = Math.max(50, startW + dx)
                       setTargetWidth(newW)
                     }
-                    const up = (_ev: PointerEvent) => {
+                    const up = () => {
                       setIsResizing(false)
                       ;(e.target as HTMLElement).releasePointerCapture(e.pointerId)
                       window.removeEventListener('pointermove', move)
@@ -919,6 +989,8 @@ export default function Editor() {
         targetWidth={targetWidth}
         setTargetWidth={setTargetWidth}
         onDownload={download}
+        exportSettings={exportSettings}
+        onChangeExportSettings={(patch) => setExportSettings((prev) => ({ ...prev, ...patch }))}
       />
     </SidebarProvider>
   )
