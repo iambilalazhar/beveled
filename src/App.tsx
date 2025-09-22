@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Editor from '@/editor/Editor'
 import { Button } from '@/components/ui/button'
 import './App.css'
+import { Github } from 'lucide-react'
 
 type RoutePath = '/' | '/editor' | '/privacy' | '/terms'
 
@@ -80,6 +81,17 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
                 or try the editor without an image
               </Button>
             </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <a
+                href="https://github.com/iambilalazhar/beveled"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <Github className="size-4" />
+                <span>Star us on GitHub</span>
+              </a>
+            </div>
           </div>
         </div>
       </main>
@@ -106,6 +118,15 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
                 className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Terms of Service
+              </a>
+              <a
+                href="https://github.com/iambilalazhar/beveled"
+                target="_blank"
+                rel="noreferrer noopener"
+                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors inline-flex items-center gap-1"
+              >
+                <Github className="size-3" />
+                <span>GitHub</span>
               </a>
             </nav>
           </div>
