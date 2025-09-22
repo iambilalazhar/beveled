@@ -314,7 +314,7 @@ async function captureWithViewport(tab: chrome.tabs.Tab, viewport: ViewportPrese
   if (!tab.id) throw new Error('No active tab found')
 
   let debuggee: chrome.debugger.Debuggee | null = null
-  const scrollStyleId = '__good_screenshots_scroll_lock'
+  const scrollStyleId = '__beveled_scroll_lock'
 
   try {
     debuggee = await attachDebugger(tab.id)

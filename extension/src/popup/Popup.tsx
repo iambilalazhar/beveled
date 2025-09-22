@@ -155,8 +155,8 @@ export default function Popup() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Camera className="size-4 text-blue-600" />
-              <CardTitle className="text-base">Good Screenshots</CardTitle>
+              <img src="/beveled_icon.png" alt="beveled" className="size-4" />
+              <CardTitle className="text-base logo-wordmark lowercase">beveled</CardTitle>
             </div>
             <ThemeToggle />
           </div>

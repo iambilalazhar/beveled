@@ -1,42 +1,77 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* Intentionally empty to avoid Vite template styles interfering with layout. */
+/* Home theming helpers for Beveled */
+.bg-card { background-color: color-mix(in oklab, Canvas 92%, CanvasText 8%); }
+
+/* Grainy gradient background for home page - Light Mode */
+.home-gradient {
+  /* Base gradient using your design system colors */
+  background: linear-gradient(135deg, 
+    oklch(0.9383 0.0042 236.4993) 0%,    /* --background */
+    oklch(0.9846 0.0017 247.8389) 25%,   /* --muted */
+    oklch(0.9119 0.0222 243.8174) 50%,   /* --accent */
+    oklch(0.9846 0.0017 247.8389) 75%,   /* --muted */
+    oklch(0.9383 0.0042 236.4993) 100%   /* --background */
+  );
+  position: relative;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.home-gradient::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    /* Primary tangerine glows using your exact primary color */
+    radial-gradient(circle at 20% 20%, oklch(0.6397 0.1720 36.4421 / 0.25) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, oklch(0.6397 0.1720 36.4421 / 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, oklch(0.6397 0.1720 36.4421 / 0.12) 0%, transparent 45%),
+    /* Secondary warm colors */
+    radial-gradient(circle at 60% 20%, oklch(0.7875 0.0917 35.9616 / 0.18) 0%, transparent 40%),
+    radial-gradient(circle at 30% 80%, oklch(0.7693 0.0876 34.1875 / 0.15) 0%, transparent 35%);
+  pointer-events: none;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.home-gradient::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 1px 1px, oklch(0.6397 0.1720 36.4421 / 0.15) 1px, transparent 0);
+  background-size: 32px 32px;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
-.card {
-  padding: 2em;
+/* Dark Mode */
+.dark .home-gradient {
+  background: linear-gradient(135deg, 
+    oklch(0.2598 0.0306 262.6666) 0%,    /* dark --background */
+    oklch(0.3095 0.0266 266.7132) 25%,   /* dark --muted */
+    oklch(0.3380 0.0589 267.5867) 50%,   /* dark --accent */
+    oklch(0.3095 0.0266 266.7132) 75%,   /* dark --muted */
+    oklch(0.2598 0.0306 262.6666) 100%   /* dark --background */
+  );
 }
 
-.read-the-docs {
-  color: #888;
+.dark .home-gradient::before {
+  background: 
+    /* Enhanced tangerine glows for dark mode */
+    radial-gradient(circle at 20% 20%, oklch(0.6397 0.1720 36.4421 / 0.35) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, oklch(0.6397 0.1720 36.4421 / 0.25) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, oklch(0.6397 0.1720 36.4421 / 0.18) 0%, transparent 45%),
+    /* Secondary warm colors for dark mode */
+    radial-gradient(circle at 60% 20%, oklch(0.7875 0.0917 35.9616 / 0.22) 0%, transparent 40%),
+    radial-gradient(circle at 30% 80%, oklch(0.7693 0.0876 34.1875 / 0.18) 0%, transparent 35%);
+}
+
+.dark .home-gradient::after {
+  background-image: 
+    radial-gradient(circle at 1px 1px, oklch(0.9219 0 0 / 0.08) 1px, transparent 0);
+  background-size: 28px 28px;
+  opacity: 0.4;
 }

@@ -16,10 +16,11 @@ import { ShapesOverlay } from './ShapesOverlay'
 import { TemplatesDropdown } from './TemplatesDropdown'
 import { TemplateProperties } from './TemplateProperties'
 import { TEMPLATES, type EditorTemplate } from './templates'
+import { getChromeSafe, isExtensionRuntime } from '@/lib/env'
 
 type Padding = { x: number; y: number }
 
-export default function Editor() {
+export default function Editor(props: { initialImageSource?: Blob | string | null } = {}) {
 
   const SOLID_PRESETS: string[] = [
     '#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0', '#0f172a', '#111827',
@@ -310,11 +311,48 @@ export default function Editor() {
     if (typeof t.imageScale === 'number') setImageScale(t.imageScale)
   }
 
+  // Track and revoke any created object URLs for web runtime
+  const objectUrlRef = useRef<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [isDraggingFile, setIsDraggingFile] = useState(false)
+
+  const setImageFromBlob = (blob: Blob) => {
+    if (objectUrlRef.current) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    const url = URL.createObjectURL(blob)
+    objectUrlRef.current = url
+    setImageUrl(url)
+  }
   useEffect(() => {
-    chrome.storage.local.get('latestCapture', (res) => {
-      if (res?.latestCapture) setImageUrl(res.latestCapture as string)
-    })
-  }, [])
+    if (isExtensionRuntime()) {
+      const ch = getChromeSafe()
+      ch?.storage?.local.get('latestCapture', (res) => {
+        if (res?.latestCapture) setImageUrl(res.latestCapture as string)
+      })
+      return
+    }
+    // Web runtime: use provided initial image source if present
+    if (props.initialImageSource) {
+      if (typeof props.initialImageSource === 'string') {
+        setImageUrl(props.initialImageSource)
+      } else {
+        const url = URL.createObjectURL(props.initialImageSource)
+        objectUrlRef.current = url
+        setImageUrl(url)
+      }
+    } else {
+      setImageUrl(null)
+    }
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current)
+        objectUrlRef.current = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.initialImageSource])
 
   const [img, setImg] = useState<HTMLImageElement | null>(null)
   useEffect(() => {
@@ -536,13 +574,27 @@ export default function Editor() {
     })
     if (!blob) return
 
+    const fileName = `screenshot.${exportSettings.format === 'jpeg' ? 'jpg' : 'png'}`
+    const ch = getChromeSafe()
+    if (ch?.downloads?.download) {
+      const url = URL.createObjectURL(blob)
+      ch.downloads.download({ url, filename: fileName })
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      return
+    }
+    // Web fallback: trigger a download via anchor element
     const url = URL.createObjectURL(blob)
-    chrome.downloads.download({ url, filename: `screenshot.${exportSettings.format === 'jpeg' ? 'jpg' : 'png'}` })
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
   }
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <div className="text-sm text-muted-foreground">Editor</div>
@@ -605,7 +657,22 @@ export default function Editor() {
             <SidebarTrigger className="-mr-1 rotate-180" />
           </div>
         </header>
-        <div ref={stageRef} className="relative flex flex-1 items-center justify-center bg-neutral-900 select-none overflow-hidden">
+        <div
+          ref={stageRef}
+          className="relative flex flex-1 items-center justify-center bg-neutral-900 select-none overflow-hidden"
+          onDragOver={(e) => {
+            if (!isExtensionRuntime()) { e.preventDefault(); setIsDraggingFile(true) }
+          }}
+          onDragLeave={() => { if (!isExtensionRuntime()) setIsDraggingFile(false) }}
+          onDrop={(e) => {
+            if (!isExtensionRuntime()) {
+              e.preventDefault()
+              setIsDraggingFile(false)
+              const file = e.dataTransfer?.files?.[0]
+              if (file && file.type.startsWith('image/')) setImageFromBlob(file)
+            }
+          }}
+        >
           {imageUrl ? (
             <>
               <canvas
@@ -951,7 +1018,34 @@ export default function Editor() {
               )}
             </>
           ) : (
-            <div className="text-neutral-500">No capture found. Use the popup to capture.</div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-neutral-400 text-center">
+                <div className="mb-4">{isExtensionRuntime() ? 'No capture found. Use the popup to capture.' : 'Drop an image here or upload from your device to start in Beveled'}</div>
+                {!isExtensionRuntime() && (
+                  <>
+                    <button
+                      className="inline-flex items-center px-4 py-2 rounded-md bg-primary text-primary-foreground"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Upload image
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0]
+                        if (f && f.type.startsWith('image/')) setImageFromBlob(f)
+                      }}
+                    />
+                  </>
+                )}
+              </div>
+              {isDraggingFile && !isExtensionRuntime() && (
+                <div className="absolute inset-4 rounded-xl border-2 border-dashed border-blue-500/70"></div>
+              )}
+            </div>
           )}
         </div>
       </SidebarInset>

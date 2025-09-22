@@ -1,11 +1,17 @@
 {
   "manifest_version": 3,
-  "name": "Good Screenshots",
+  "name": "Beveled",
   "version": "0.2.0",
   "description": "Capture beautiful screenshots with full page, mobile, tablet, and desktop viewport options",
   "action": {
-    "default_title": "Good Screenshots",
-    "default_popup": "popup.html"
+    "default_title": "Beveled",
+    "default_popup": "popup.html",
+    "default_icon": "48.png"
+  },
+  "icons": {
+    "16": "16.png",
+    "48": "48.png",
+    "128": "128.png"
   },
   "background": {
     "service_worker": "background.js",

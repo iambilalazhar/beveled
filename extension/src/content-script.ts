@@ -224,8 +224,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // Auto-inject on page load
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    console.log('Good Screenshots content script loaded')
+    console.log('Beveled content script loaded')
   })
 } else {
-  console.log('Good Screenshots content script loaded')
+  console.log('Beveled content script loaded')
 }
