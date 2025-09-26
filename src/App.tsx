@@ -36,6 +36,7 @@ function Logo() {
 
 function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) => void }) {
   const fileInputId = useMemo(() => 'upload-' + Math.random().toString(36).slice(2), [])
+  const webstoreUrl = 'https://chromewebstore.google.com/detail/beveled/kpdehbgphkkcedapekaaanpbajfmifjf'
   return (
     <div className="min-h-screen flex flex-col home-gradient">
       {/* Full viewport hero section */}
@@ -55,13 +56,24 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
           </div>
           
           <div className="space-y-4">
-            <Button 
-              size="lg" 
-              className="text-lg px-8 py-6 h-auto bg-[#e05d38] hover:bg-[#d14d28] text-white border-0 shadow-lg shadow-[#e05d38]/25"
-              onClick={() => document.getElementById(fileInputId)?.click()}
-            >
-              Upload Screenshot
-            </Button>
+            <div className="flex items-center justify-center gap-4 flex-wrap">
+              <Button 
+                size="lg" 
+                className="text-lg px-8 py-6 h-auto bg-[#e05d38] hover:bg-[#d14d28] text-white border-0 shadow-lg shadow-[#e05d38]/25 hover:shadow-[#e05d38]/40 transition-all duration-200"
+                onClick={() => document.getElementById(fileInputId)?.click()}
+              >
+                Upload Screenshot
+              </Button>
+              <Button 
+                asChild 
+                size="lg" 
+                className="text-lg px-8 py-6 h-auto bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl transition-all duration-200"
+              >
+                <a href={webstoreUrl} target="_blank" rel="noreferrer noopener">
+                  Add to Chrome
+                </a>
+              </Button>
+            </div>
             <input
               id={fileInputId}
               type="file"

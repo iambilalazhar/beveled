@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { AppSidebar, type BgPreset, type LinearGradient, type WindowStyle } from '@/components/app-sidebar'
+import { AppSidebar, type BgPreset, type CanvasPresetId, type CanvasSize, type LinearGradient, type WindowStyle } from '@/components/app-sidebar'
 import { renderComposition } from './renderer'
 import type { LayoutInfo } from './renderer'
 
@@ -64,6 +64,8 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
   const [cornerRadius, setCornerRadius] = useState(16)
   const [imageScale, setImageScale] = useState(1)
   const [targetWidth, setTargetWidth] = useState<number | null>(null)
+  const [canvasPreset, setCanvasPreset] = useState<CanvasPresetId>('auto')
+  const [customCanvasSize, setCustomCanvasSize] = useState<CanvasSize>({ width: 1080, height: 1080 })
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const stageRef = useRef<HTMLDivElement | null>(null)
@@ -104,6 +106,24 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
 
   const BASE_CONTENT_WIDTH = 1280
 
+  const resolveCanvasPreset = (preset: CanvasPresetId, custom: CanvasSize) => {
+    switch (preset) {
+      case 'square-1080':
+        return { width: 1080, height: 1080 }
+      case 'desktop-1600x900':
+        return { width: 1600, height: 900 }
+      case 'hd-1920x1080':
+        return { width: 1920, height: 1080 }
+      case 'custom':
+        return {
+          width: Math.max(320, Math.round(custom.width)),
+          height: Math.max(320, Math.round(custom.height)),
+        }
+      default:
+        return null
+    }
+  }
+
   function applyTemplate(t: EditorTemplate) {
     // Frame
     setBgPreset(t.bg)
@@ -128,6 +148,8 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
       setShadowOffsetY(8)
       setShadowOpacity(0.2)
     }
+
+    setCanvasPreset('auto')
 
     // Compute helpful layout numbers up front
     const tplWindowBar = t.windowStyle ? windowBarHeights[t.windowStyle] : 44
@@ -384,6 +406,12 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
     const baseTotalW = Math.max(1, Math.round(baseWidth + padding.x * 2))
     const baseTotalH = Math.max(1, Math.round(baseHeight + padding.y * 2 + extraTop))
 
+    const presetSize = resolveCanvasPreset(canvasPreset, customCanvasSize)
+    const desiredCanvasW = presetSize ? Math.max(200, presetSize.width) : baseTotalW
+    const desiredCanvasH = presetSize ? Math.max(200, presetSize.height) : baseTotalH
+    const minCanvasW = Math.max(baseTotalW, desiredCanvasW)
+    const minCanvasH = Math.max(baseTotalH, desiredCanvasH)
+
     const layoutKey = JSON.stringify({
       sw: showWindow,
       ws: windowStyle,
@@ -393,13 +421,25 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
       py: padding.y,
       iw: srcW,
       ih: srcH,
-      tw: targetWidth ?? null,
-      is: imageScale,
+      cx: cropRect?.x ?? null,
+      cy: cropRect?.y ?? null,
+      cw: cropRect?.w ?? null,
+      ch: cropRect?.h ?? null,
+      preset: canvasPreset,
+      pw: presetSize?.width ?? null,
+      ph: presetSize?.height ?? null,
       ov: stageHasOverlays,
     })
     if (!baseSizeRef.current || layoutKeyRef.current !== layoutKey) {
-      baseSizeRef.current = { w: baseTotalW, h: baseTotalH }
+      baseSizeRef.current = { w: minCanvasW, h: minCanvasH }
       layoutKeyRef.current = layoutKey
+    } else if (canvasPreset === 'auto') {
+      baseSizeRef.current = {
+        w: Math.max(baseSizeRef.current.w, minCanvasW),
+        h: Math.max(baseSizeRef.current.h, minCanvasH),
+      }
+    } else {
+      baseSizeRef.current = { w: minCanvasW, h: minCanvasH }
     }
     // HiDPI setup: size the backing store to device pixels, draw in CSS pixels
     const cssW = baseSizeRef.current.w
@@ -465,7 +505,7 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
         top: cRect.top - sRect.top + imgBottom,
       })
     })
-  }, [img, bgPreset, padding, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, windowBar, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes])
+  }, [img, bgPreset, padding, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, windowBar, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes, canvasPreset, customCanvasSize.width, customCanvasSize.height])
 
   // Reset image offset when a new image loads
   useEffect(() => {
@@ -659,7 +699,7 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
         </header>
         <div
           ref={stageRef}
-          className="relative flex flex-1 items-center justify-center bg-neutral-900 select-none overflow-hidden"
+          className="relative flex min-h-0 min-w-0 flex-1 items-center justify-center bg-neutral-900 select-none overflow-hidden"
           onDragOver={(e) => {
             if (!isExtensionRuntime()) { e.preventDefault(); setIsDraggingFile(true) }
           }}
@@ -1082,6 +1122,10 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
         setImageScale={setImageScale}
         targetWidth={targetWidth}
         setTargetWidth={setTargetWidth}
+        canvasPreset={canvasPreset}
+        setCanvasPreset={setCanvasPreset}
+        customCanvasSize={customCanvasSize}
+        setCustomCanvasSize={setCustomCanvasSize}
         onDownload={download}
         exportSettings={exportSettings}
         onChangeExportSettings={(patch) => setExportSettings((prev) => ({ ...prev, ...patch }))}

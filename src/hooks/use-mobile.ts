@@ -1,26 +1,34 @@
 import * as React from "react"
-import { isExtensionRuntime } from "@/lib/env"
-
 const MOBILE_BREAKPOINT = 768
 
 export function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
 
   React.useEffect(() => {
-    // For web version, always use desktop layout to ensure sidebar shows properly
-    if (!isExtensionRuntime()) {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
       setIsMobile(false)
       return
     }
 
-    // For extension, use normal mobile detection
-    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
-    const onChange = () => {
-      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    const query = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`
+    const mql = window.matchMedia(query)
+
+    const update = (matches: boolean) => {
+      setIsMobile(matches)
     }
-    mql.addEventListener("change", onChange)
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
-    return () => mql.removeEventListener("change", onChange)
+
+    const onChange = (event: MediaQueryListEvent) => update(event.matches)
+
+    update(mql.matches)
+
+    if (typeof mql.addEventListener === "function") {
+      mql.addEventListener("change", onChange)
+      return () => mql.removeEventListener("change", onChange)
+    }
+
+    // Safari < 14 fallback
+    mql.addListener(onChange)
+    return () => mql.removeListener(onChange)
   }, [])
 
   return !!isMobile

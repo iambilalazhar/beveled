@@ -88,6 +88,8 @@ export type Pattern = {
 export type BgPreset = LinearGradient | Solid | Pattern
 export type WindowStyle = 'regular' | 'notch' | 'title'
 export type ShadowStrength = 'off' | 'subtle' | 'medium' | 'strong'
+export type CanvasPresetId = 'auto' | 'square-1080' | 'desktop-1600x900' | 'hd-1920x1080' | 'custom'
+export type CanvasSize = { width: number; height: number }
 
 export function AppSidebar({
   solidPresets,
@@ -121,6 +123,10 @@ export function AppSidebar({
   setImageScale,
   targetWidth,
   setTargetWidth,
+  canvasPreset,
+  setCanvasPreset,
+  customCanvasSize,
+  setCustomCanvasSize,
   onDownload,
   exportSettings,
   onChangeExportSettings,
@@ -157,6 +163,10 @@ export function AppSidebar({
   setImageScale: (v: number) => void
   targetWidth: number | null
   setTargetWidth: (v: number | null) => void
+  canvasPreset: CanvasPresetId
+  setCanvasPreset: React.Dispatch<React.SetStateAction<CanvasPresetId>>
+  customCanvasSize: CanvasSize
+  setCustomCanvasSize: React.Dispatch<React.SetStateAction<CanvasSize>>
   onDownload: () => void
   exportSettings: { format: 'png' | 'jpeg'; quality: number; scale: number }
   onChangeExportSettings: (patch: Partial<{ format: 'png' | 'jpeg'; quality: number; scale: number }>) => void
@@ -221,6 +231,58 @@ export function AppSidebar({
                   <Label>Scale: {Math.round(imageScale * 100)}%</Label>
                   <Slider min={10} max={300} step={1} value={[Math.round(imageScale * 100)]} onValueChange={(v) => setImageScale((v[0] ?? 100) / 100)} />
                 </div>
+                <div className="space-y-2">
+                  <Label>Canvas size</Label>
+                  <Select value={canvasPreset} onValueChange={(value) => setCanvasPreset(value as CanvasPresetId)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Auto (fit content)</SelectItem>
+                      <SelectItem value="square-1080">Square 1080 x 1080</SelectItem>
+                      <SelectItem value="desktop-1600x900">Desktop 1600 x 900</SelectItem>
+                      <SelectItem value="hd-1920x1080">HD 1920 x 1080</SelectItem>
+                      <SelectItem value="custom">Custom…</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Canvas expands automatically if the image exceeds the selected size.</p>
+                </div>
+                {canvasPreset === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label htmlFor="canvas-width">Width</Label>
+                      <Input
+                        id="canvas-width"
+                        type="number"
+                        min={320}
+                        max={6000}
+                        value={customCanvasSize.width}
+                        onChange={(e) => {
+                          const val = Number(e.currentTarget.value)
+                          if (Number.isNaN(val)) return
+                          const next = Math.min(6000, Math.max(320, Math.round(val)))
+                          setCustomCanvasSize((prev) => ({ ...prev, width: next }))
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="canvas-height">Height</Label>
+                      <Input
+                        id="canvas-height"
+                        type="number"
+                        min={320}
+                        max={6000}
+                        value={customCanvasSize.height}
+                        onChange={(e) => {
+                          const val = Number(e.currentTarget.value)
+                          if (Number.isNaN(val)) return
+                          const next = Math.min(6000, Math.max(320, Math.round(val)))
+                          setCustomCanvasSize((prev) => ({ ...prev, height: next }))
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label>Width (px)</Label>
                   <div className="flex items-center gap-2">
