@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Beveled Screenshot Editor & Screen Capture",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Capture beautiful screenshots with full page, mobile, tablet, and desktop viewport options",
+  "privacy_policy": "https://beveled.app/privacy.html",
   "action": {
     "default_title": "Beveled Screenshot Editor",
     "default_popup": "popup.html",

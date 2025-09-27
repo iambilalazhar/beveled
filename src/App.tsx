@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import './App.css'
 import { Github } from 'lucide-react'
 
-type RoutePath = '/' | '/editor' | '/privacy' | '/terms'
+type RoutePath = '/' | '/editor' | '/terms'
 
 function useRoute(): [RoutePath, (path: RoutePath) => void] {
   const getPath = () => (window.location.pathname as RoutePath) || '/'
@@ -118,8 +118,9 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
             </div>
             <nav className="flex items-center gap-6 text-sm">
               <a 
-                href="/privacy" 
-                onClick={(e) => { e.preventDefault(); props.goTo('/privacy') }} 
+                href="https://beveled.app/privacy.html" 
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
               >
                 Privacy Policy
@@ -148,128 +149,6 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
   )
 }
 
-function PrivacyPage(props: { goTo: (p: RoutePath) => void }) {
-  useEffect(() => { document.title = 'Beveled – Privacy Policy' }, [])
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-4xl mx-auto px-4 py-12">
-        <div className="mb-8 flex items-center justify-between">
-          <Logo />
-          <Button variant="outline" size="sm" onClick={() => props.goTo('/')}>← Back to Home</Button>
-        </div>
-        
-        <div className="prose prose-gray dark:prose-invert max-w-none">
-          <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
-          <p className="text-muted-foreground mb-8">Last updated: January 2025</p>
-          
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Introduction</h2>
-              <p className="leading-7">
-                At Beveled, we respect your privacy and are committed to protecting your personal data. This Privacy Policy explains how we collect, use, and safeguard your information when you use our screenshot enhancement tool.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Information We Collect</h2>
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Images and Content</h3>
-                  <p className="leading-7">
-                    • <strong>Screenshots and Images:</strong> When you upload images to Beveled, they are processed entirely within your browser. We do not store, transmit, or have access to your images on our servers.
-                  </p>
-                  <p className="leading-7">
-                    • <strong>Local Storage:</strong> Your projects, settings, and preferences are stored locally in your browser's storage. This data never leaves your device.
-                  </p>
-                </div>
-                
-                <div>
-                  <h3 className="text-lg font-medium mb-2">Usage Data</h3>
-                  <p className="leading-7">
-                    • <strong>Browser Extension:</strong> When used as a browser extension, Beveled may collect minimal usage analytics to improve functionality, such as feature usage patterns and error reports. This data is anonymized and contains no personal information.
-                  </p>
-                  <p className="leading-7">
-                    • <strong>Web Application:</strong> When used as a web application, we may collect standard web analytics data including page views, session duration, and general usage patterns through privacy-focused analytics services.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">How We Use Your Information</h2>
-              <ul className="list-disc list-inside space-y-2 leading-7">
-                <li>To provide and maintain the Beveled service</li>
-                <li>To improve our application's performance and user experience</li>
-                <li>To analyze usage patterns and optimize features</li>
-                <li>To provide customer support when requested</li>
-                <li>To comply with legal obligations</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Data Security</h2>
-              <p className="leading-7">
-                We implement appropriate technical and organizational measures to protect your data:
-              </p>
-              <ul className="list-disc list-inside space-y-2 leading-7 mt-4">
-                <li>All image processing occurs locally in your browser</li>
-                <li>No images are transmitted to external servers</li>
-                <li>Local data is encrypted using browser security standards</li>
-                <li>Regular security assessments and updates</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Third-Party Services</h2>
-              <p className="leading-7">
-                Beveled may integrate with third-party services for analytics and performance monitoring. These services are carefully selected for their privacy practices and data protection standards. We ensure that any third-party integrations comply with applicable privacy laws.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Your Rights</h2>
-              <p className="leading-7">You have the right to:</p>
-              <ul className="list-disc list-inside space-y-2 leading-7 mt-4">
-                <li>Access and review any personal data we may have</li>
-                <li>Request deletion of your data</li>
-                <li>Opt out of analytics and data collection</li>
-                <li>Clear local storage data at any time through your browser settings</li>
-                <li>Request information about how your data is processed</li>
-              </ul>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Children's Privacy</h2>
-              <p className="leading-7">
-                Beveled is not intended for use by children under the age of 13. We do not knowingly collect personal information from children under 13. If you become aware that a child has provided us with personal information, please contact us immediately.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Changes to This Policy</h2>
-              <p className="leading-7">
-                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date. You are advised to review this Privacy Policy periodically for any changes.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Contact Us</h2>
-              <p className="leading-7">
-                If you have any questions about this Privacy Policy or our data practices, please contact us at:
-              </p>
-              <div className="mt-4 p-4 bg-muted rounded-lg">
-                <p className="font-medium">Email: privacy@beveled.app</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  We will respond to privacy inquiries within 30 days.
-                </p>
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 function TermsPage(props: { goTo: (p: RoutePath) => void }) {
   useEffect(() => { document.title = 'Beveled – Terms of Service' }, [])
@@ -427,7 +306,6 @@ function App() {
     navigate('/editor')
   }
 
-  if (route === '/privacy') return <PrivacyPage goTo={navigate} />
   if (route === '/terms') return <TermsPage goTo={navigate} />
   if (route === '/editor') return <Editor initialImageSource={initialImage} />
   return <HomePage onUpload={onUpload} goTo={navigate} />
