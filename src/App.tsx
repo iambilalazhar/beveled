@@ -2,9 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import Editor from '@/editor/Editor'
 import { Button } from '@/components/ui/button'
 import './App.css'
-import { Github } from 'lucide-react'
+import { Github, ArrowRight, Sparkles, Palette, Circle, Grid3X3, Image } from 'lucide-react'
 
-type RoutePath = '/' | '/editor' | '/terms'
+// Import tools
+import GradientGenerator from '@/tools/GradientGenerator'
+import BackgroundGenerator from '@/tools/BackgroundGenerator'
+import BlobGenerator from '@/tools/BlobGenerator'
+import MeshGradientGenerator from '@/tools/MeshGradientGenerator'
+
+type RoutePath = '/' | '/editor' | '/terms' | '/tools/gradient' | '/tools/background' | '/tools/blob' | '/tools/mesh-gradient'
 
 function useRoute(): [RoutePath, (path: RoutePath) => void] {
   const getPath = () => (window.location.pathname as RoutePath) || '/'
@@ -20,6 +26,7 @@ function useRoute(): [RoutePath, (path: RoutePath) => void] {
     if (p === path) return
     window.history.pushState({}, '', p)
     setPath(p)
+    window.scrollTo(0, 0)
   }
 
   return [path, navigate]
@@ -34,44 +41,140 @@ function Logo() {
   )
 }
 
+interface ToolCardProps {
+  title: string
+  description: string
+  icon: React.ReactNode
+  gradient: string
+  onClick: () => void
+  featured?: boolean
+}
+
+function ToolCard({ title, description, icon, gradient, onClick, featured }: ToolCardProps) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative overflow-hidden rounded-2xl border bg-card text-left transition-all hover:shadow-xl hover:scale-[1.02] hover:border-primary/50 ${featured ? 'md:col-span-2 md:row-span-2' : ''}`}
+    >
+      <div className={`absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity ${gradient}`} />
+      <div className={`relative p-6 ${featured ? 'md:p-10' : ''}`}>
+        <div className={`inline-flex items-center justify-center rounded-xl bg-gradient-to-br ${gradient} p-3 text-white shadow-lg mb-4`}>
+          {icon}
+        </div>
+        <h3 className={`font-semibold mb-2 ${featured ? 'text-2xl' : 'text-lg'}`}>{title}</h3>
+        <p className={`text-muted-foreground ${featured ? 'text-base' : 'text-sm'}`}>{description}</p>
+        <div className="flex items-center gap-1 mt-4 text-primary text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+          Try now <ArrowRight className="size-4" />
+        </div>
+      </div>
+    </button>
+  )
+}
+
 function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) => void }) {
   const fileInputId = useMemo(() => 'upload-' + Math.random().toString(36).slice(2), [])
   const webstoreUrl = 'https://chromewebstore.google.com/detail/beveled/kpdehbgphkkcedapekaaanpbajfmifjf'
+
+  const tools = [
+    {
+      title: 'Screenshot Editor',
+      description: 'Transform screenshots into stunning visuals with backgrounds, shadows, and professional styling. Add text, shapes, and window chrome.',
+      icon: <Image className="size-6" />,
+      gradient: 'from-[#e05d38] to-[#ff8a65]',
+      path: '/editor' as RoutePath,
+      featured: true
+    },
+    {
+      title: 'Gradient Generator',
+      description: 'Create beautiful CSS gradients with an intuitive visual editor.',
+      icon: <Palette className="size-5" />,
+      gradient: 'from-[#667eea] to-[#764ba2]',
+      path: '/tools/gradient' as RoutePath
+    },
+    {
+      title: 'Mesh Gradient',
+      description: 'Design stunning mesh gradients with multiple color points.',
+      icon: <Sparkles className="size-5" />,
+      gradient: 'from-[#f093fb] to-[#f5576c]',
+      path: '/tools/mesh-gradient' as RoutePath
+    },
+    {
+      title: 'Background Patterns',
+      description: 'Generate seamless CSS patterns for your designs.',
+      icon: <Grid3X3 className="size-5" />,
+      gradient: 'from-[#11998e] to-[#38ef7d]',
+      path: '/tools/background' as RoutePath
+    },
+    {
+      title: 'Blob Generator',
+      description: 'Create organic blob shapes for modern designs.',
+      icon: <Circle className="size-5" />,
+      gradient: 'from-[#4facfe] to-[#00f2fe]',
+      path: '/tools/blob' as RoutePath
+    },
+  ]
+
   return (
-    <div className="min-h-screen flex flex-col home-gradient">
-      {/* Full viewport hero section */}
-      <main className="flex-1 flex items-center justify-center px-4 relative z-10">
-        <div className="text-center max-w-2xl mx-auto space-y-8">
-          <div className="mb-8">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <img src="/beveled_icon.png" alt="Beveled" width={48} height={48} />
-              <h1 className="text-5xl logo-wordmark lowercase">beveled</h1>
+    <div className="min-h-screen flex flex-col">
+      {/* Header */}
+      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+          <Logo />
+          <nav className="flex items-center gap-4">
+            <a
+              href="https://github.com/iambilalazhar/beveled"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Github className="size-5" />
+            </a>
+            <Button
+              asChild
+              size="sm"
+              className="bg-[#e05d38] hover:bg-[#d14d28] text-white"
+            >
+              <a href={webstoreUrl} target="_blank" rel="noreferrer noopener">
+                Add to Chrome
+              </a>
+            </Button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 home-gradient opacity-50" />
+        <div className="relative max-w-6xl mx-auto px-4 py-16 md:py-24">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
+              <Sparkles className="size-4" />
+              Free design tools for developers
             </div>
-            <h1 className="mb-8 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Make Your Screenshots Better
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight mb-6">
+              Design Tools That{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#e05d38] to-[#ff8a65]">
+                Just Work
+              </span>
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-              Transform ordinary screenshots into beautiful, professional images with custom backgrounds, shadows, and branding elements.
+            <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
+              A collection of free, privacy-first design tools. Create beautiful screenshots, gradients, patterns, and more — all processed locally in your browser.
             </p>
-          </div>
-          
-          <div className="space-y-4">
             <div className="flex items-center justify-center gap-4 flex-wrap">
-              <Button 
-                size="lg" 
-                className="text-lg px-8 py-6 h-auto bg-[#e05d38] hover:bg-[#d14d28] text-white border-0 shadow-lg shadow-[#e05d38]/25 hover:shadow-[#e05d38]/40 transition-all duration-200"
+              <Button
+                size="lg"
+                className="text-lg px-8 py-6 h-auto bg-[#e05d38] hover:bg-[#d14d28] text-white border-0 shadow-lg shadow-[#e05d38]/25 hover:shadow-[#e05d38]/40 transition-all"
                 onClick={() => document.getElementById(fileInputId)?.click()}
               >
                 Upload Screenshot
               </Button>
-              <Button 
-                asChild 
-                size="lg" 
-                className="text-lg px-8 py-6 h-auto bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-200 hover:border-gray-300 shadow-lg hover:shadow-xl transition-all duration-200"
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-8 py-6 h-auto"
+                onClick={() => props.goTo('/editor')}
               >
-                <a href={webstoreUrl} target="_blank" rel="noreferrer noopener">
-                  Add to Chrome
-                </a>
+                Open Editor
               </Button>
             </div>
             <input
@@ -84,51 +187,111 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
                 if (f) props.onUpload(f)
               }}
             />
-            <div>
-              <Button 
-                variant="ghost" 
-                onClick={() => props.goTo('/editor')}
-                className="text-gray-600 hover:text-gray-800 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-white/10"
-              >
-                or try the editor without an image
-              </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Tools Grid */}
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold mb-4">All Tools</h2>
+            <p className="text-muted-foreground">Everything you need to create stunning visuals</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-4 md:gap-6">
+            {tools.map((tool, i) => (
+              <ToolCard
+                key={i}
+                {...tool}
+                onClick={() => props.goTo(tool.path)}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="py-16 md:py-24">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <svg className="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">100% Private</h3>
+              <p className="text-muted-foreground text-sm">
+                All processing happens in your browser. Your files never leave your device.
+              </p>
             </div>
-            <div className="flex items-center justify-center gap-3 pt-2">
-              <a
-                href="https://github.com/iambilalazhar/beveled"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <Github className="size-4" />
-                <span>Star us on GitHub</span>
-              </a>
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <svg className="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Lightning Fast</h3>
+              <p className="text-muted-foreground text-sm">
+                No uploads or server processing. Get results instantly with zero latency.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                <svg className="size-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Completely Free</h3>
+              <p className="text-muted-foreground text-sm">
+                No sign-up, no watermarks, no limits. Use all tools without restrictions.
+              </p>
             </div>
           </div>
         </div>
-      </main>
-      
+      </section>
+
+      {/* CTA */}
+      <section className="py-16 md:py-24 bg-muted/30">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h2 className="text-3xl font-bold mb-4">Get the Chrome Extension</h2>
+          <p className="text-muted-foreground mb-8">
+            Capture screenshots directly from any webpage and edit them instantly with Beveled.
+          </p>
+          <Button
+            asChild
+            size="lg"
+            className="text-lg px-8 py-6 h-auto bg-[#e05d38] hover:bg-[#d14d28] text-white"
+          >
+            <a href={webstoreUrl} target="_blank" rel="noreferrer noopener">
+              Add to Chrome — It's Free
+            </a>
+          </Button>
+        </div>
+      </section>
+
       {/* Footer */}
-      <footer className="border-t border-gray-200/50 bg-white/30 backdrop-blur-sm relative z-10 dark:border-white/10 dark:bg-black/20">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+      <footer className="border-t bg-background">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <img src="/beveled_icon.png" alt="Beveled" width={20} height={20} />
               <span>© 2025 Beveled. All rights reserved.</span>
             </div>
             <nav className="flex items-center gap-6 text-sm">
-              <a 
-                href="https://beveled.app/privacy.html" 
+              <a
+                href="https://beveled.app/privacy.html"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Privacy Policy
               </a>
-              <a 
-                href="/terms" 
-                onClick={(e) => { e.preventDefault(); props.goTo('/terms') }} 
-                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors"
+              <a
+                href="/terms"
+                onClick={(e) => { e.preventDefault(); props.goTo('/terms') }}
+                className="text-muted-foreground hover:text-foreground transition-colors"
               >
                 Terms of Service
               </a>
@@ -136,10 +299,10 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
                 href="https://github.com/iambilalazhar/beveled"
                 target="_blank"
                 rel="noreferrer noopener"
-                className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 transition-colors inline-flex items-center gap-1"
+                className="text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1"
               >
-                <Github className="size-3" />
-                <span>GitHub</span>
+                <Github className="size-4" />
+                GitHub
               </a>
             </nav>
           </div>
@@ -148,7 +311,6 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
     </div>
   )
 }
-
 
 function TermsPage(props: { goTo: (p: RoutePath) => void }) {
   useEffect(() => { document.title = 'Beveled – Terms of Service' }, [])
@@ -159,11 +321,11 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
           <Logo />
           <Button variant="outline" size="sm" onClick={() => props.goTo('/')}>← Back to Home</Button>
         </div>
-        
+
         <div className="prose prose-gray dark:prose-invert max-w-none">
           <h1 className="text-4xl font-bold mb-2">Terms of Service</h1>
           <p className="text-muted-foreground mb-8">Last updated: January 2025</p>
-          
+
           <div className="space-y-8">
             <section>
               <h2 className="text-2xl font-semibold mb-4">Agreement to Terms</h2>
@@ -189,9 +351,6 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
                 <li>Harass, abuse, insult, harm, defame, slander, disparage, intimidate, or discriminate</li>
                 <li>Submit false or misleading information</li>
                 <li>Upload or transmit viruses or any other type of malicious code</li>
-                <li>Spam, phish, pharm, pretext, spider, crawl, or scrape</li>
-                <li>Use the Service for any obscene or immoral purpose</li>
-                <li>Interfere with or circumvent the security features of the Service</li>
               </ul>
             </section>
 
@@ -199,24 +358,9 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
               <h2 className="text-2xl font-semibold mb-4">User Content</h2>
               <div className="space-y-4">
                 <p className="leading-7">
-                  You retain full ownership of any images, screenshots, or other content you upload to Beveled. By using the Service, you represent and warrant that:
-                </p>
-                <ul className="list-disc list-inside space-y-2 leading-7">
-                  <li>You own or have the necessary rights to use and authorize the use of your content</li>
-                  <li>Your content does not infringe upon the rights of any third party</li>
-                  <li>Your content does not violate any applicable laws or regulations</li>
-                </ul>
-                <p className="leading-7">
-                  We do not claim ownership of your content. All processing occurs locally in your browser, and we do not store or have access to your images.
+                  You retain full ownership of any images, screenshots, or other content you upload to Beveled. We do not claim ownership of your content. All processing occurs locally in your browser, and we do not store or have access to your images.
                 </p>
               </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Intellectual Property Rights</h2>
-              <p className="leading-7">
-                The Service and its original content, features, and functionality are and will remain the exclusive property of Beveled and its licensors. The Service is protected by copyright, trademark, and other laws. Our trademarks and trade dress may not be used in connection with any product or service without our prior written consent.
-              </p>
             </section>
 
             <section>
@@ -228,48 +372,8 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
 
             <section>
               <h2 className="text-2xl font-semibold mb-4">Disclaimers</h2>
-              <div className="space-y-4">
-                <p className="leading-7">
-                  <strong>THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS.</strong> BEVELED MAKES NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, AS TO THE OPERATION OF THE SERVICE OR THE INFORMATION, CONTENT, MATERIALS, OR PRODUCTS INCLUDED ON THE SERVICE.
-                </p>
-                <p className="leading-7">
-                  TO THE FULL EXTENT PERMISSIBLE BY APPLICABLE LAW, BEVELED DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
-                </p>
-              </div>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Limitation of Liability</h2>
               <p className="leading-7">
-                IN NO EVENT SHALL BEVELED, ITS DIRECTORS, EMPLOYEES, PARTNERS, AGENTS, SUPPLIERS, OR AFFILIATES BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION, LOSS OF PROFITS, DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, RESULTING FROM YOUR USE OF THE SERVICE.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Indemnification</h2>
-              <p className="leading-7">
-                You agree to defend, indemnify, and hold harmless Beveled and its licensee and licensors, and their employees, contractors, agents, officers and directors, from and against any and all claims, damages, obligations, losses, liabilities, costs or debt, and expenses (including but not limited to attorney's fees).
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Termination</h2>
-              <p className="leading-7">
-                We may terminate or suspend your access immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Service will cease immediately.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Governing Law</h2>
-              <p className="leading-7">
-                These Terms shall be interpreted and governed by the laws of the jurisdiction in which Beveled operates, without regard to its conflict of law provisions. Our failure to enforce any right or provision of these Terms will not be considered a waiver of those rights.
-              </p>
-            </section>
-
-            <section>
-              <h2 className="text-2xl font-semibold mb-4">Changes to Terms</h2>
-              <p className="leading-7">
-                We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days notice prior to any new terms taking effect. What constitutes a material change will be determined at our sole discretion.
+                THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS. BEVELED MAKES NO REPRESENTATIONS OR WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED.
               </p>
             </section>
 
@@ -280,9 +384,6 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
               </p>
               <div className="mt-4 p-4 bg-muted rounded-lg">
                 <p className="font-medium">Email: legal@beveled.app</p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  We will respond to legal inquiries within 30 days.
-                </p>
               </div>
             </section>
           </div>
@@ -297,8 +398,8 @@ function App() {
   const [initialImage, setInitialImage] = useState<Blob | string | null>(null)
 
   useEffect(() => {
-    if (route === '/') document.title = 'Beveled – Make your screenshots better'
-    if (route === '/editor') document.title = 'Beveled – Editor'
+    if (route === '/') document.title = 'Beveled - Free Design Tools for Developers'
+    if (route === '/editor') document.title = 'Screenshot Editor - Beveled'
   }, [route])
 
   const onUpload = (blob: Blob) => {
@@ -306,8 +407,17 @@ function App() {
     navigate('/editor')
   }
 
+  // Wrapper for tools that use string paths
+  const goToPath = (path: string) => navigate(path as RoutePath)
+
+  // Route handling
   if (route === '/terms') return <TermsPage goTo={navigate} />
   if (route === '/editor') return <Editor initialImageSource={initialImage} />
+  if (route === '/tools/gradient') return <GradientGenerator goTo={goToPath} />
+  if (route === '/tools/background') return <BackgroundGenerator goTo={goToPath} />
+  if (route === '/tools/blob') return <BlobGenerator goTo={goToPath} />
+  if (route === '/tools/mesh-gradient') return <MeshGradientGenerator goTo={goToPath} />
+
   return <HomePage onUpload={onUpload} goTo={navigate} />
 }
 
