@@ -373,7 +373,6 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
         objectUrlRef.current = null
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.initialImageSource])
 
   const [img, setImg] = useState<HTMLImageElement | null>(null)
@@ -505,7 +504,7 @@ export default function Editor(props: { initialImageSource?: Blob | string | nul
         top: cRect.top - sRect.top + imgBottom,
       })
     })
-  }, [img, bgPreset, padding, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, windowBar, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes, canvasPreset, customCanvasSize.width, customCanvasSize.height])
+  }, [img, bgPreset, padding, padding.x, padding.y, shadowEnabled, shadowColor, shadowOpacity, shadowBlur, shadowOffsetX, shadowOffsetY, showWindow, windowStyle, windowBarColor, windowBar, imageScale, targetWidth, cornerRadius, imageOffset.x, imageOffset.y, cropRect, cropRect?.x, cropRect?.y, cropRect?.w, cropRect?.h, texts, shapes, canvasPreset, customCanvasSize, customCanvasSize.width, customCanvasSize.height])
 
   // Reset image offset when a new image loads
   useEffect(() => {

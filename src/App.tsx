@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
-import Editor from '@/editor/Editor'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import './App.css'
 import { Github } from 'lucide-react'
 
-type RoutePath = '/' | '/editor' | '/terms'
+const MockupEditor = lazy(() => import('@/mockup/ui/MockupEditor'))
+const ClassicEditor = lazy(() => import('@/editor/Editor'))
+
+type RoutePath = '/' | '/editor' | '/classic' | '/terms'
 
 function useRoute(): [RoutePath, (path: RoutePath) => void] {
   const getPath = () => (window.location.pathname as RoutePath) || '/'
@@ -48,10 +50,10 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
               <h1 className="text-5xl logo-wordmark lowercase">beveled</h1>
             </div>
             <h1 className="mb-8 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Make Your Screenshots Better
+              Turn Screenshots Into 3D Device Mockups
             </h1>
             <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-              Transform ordinary screenshots into beautiful, professional images with custom backgrounds, shadows, and branding elements.
+              Drop a screenshot or screen recording onto an iPhone, iPad, MacBook, display, browser window or watch. Orbit the camera, dial in studio lighting, depth of field and motion, then export a crisp PNG, WebP or WebM — all rendered locally in your browser.
             </p>
           </div>
           
@@ -77,7 +79,7 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
             <input
               id={fileInputId}
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp"
+              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,video/mp4,video/webm"
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
@@ -90,8 +92,15 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
                 onClick={() => props.goTo('/editor')}
                 className="text-gray-600 hover:text-gray-800 hover:bg-black/5 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-white/10"
               >
-                or try the editor without an image
+                or open the 3D editor without an image
               </Button>
+            </div>
+            <div className="flex items-center justify-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+              <span>iPhone · Android · iPad · MacBook · Display · Browser · Watch</span>
+              <span aria-hidden>·</span>
+              <a href="/classic" onClick={(e) => { e.preventDefault(); props.goTo('/classic') }} className="underline-offset-4 hover:underline">
+                Classic 2D editor
+              </a>
             </div>
             <div className="flex items-center justify-center gap-3 pt-2">
               <a
@@ -292,13 +301,22 @@ function TermsPage(props: { goTo: (p: RoutePath) => void }) {
   )
 }
 
+function EditorFallback() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-[#0a0a0a] font-mono text-[11px] uppercase tracking-[0.14em] text-white/50">
+      Loading editor…
+    </div>
+  )
+}
+
 function App() {
   const [route, navigate] = useRoute()
   const [initialImage, setInitialImage] = useState<Blob | string | null>(null)
 
   useEffect(() => {
-    if (route === '/') document.title = 'Beveled – Make your screenshots better'
-    if (route === '/editor') document.title = 'Beveled – Editor'
+    if (route === '/') document.title = 'Beveled – 3D device mockups from your screenshots'
+    if (route === '/editor') document.title = 'Beveled – 3D Mockup Editor'
+    if (route === '/classic') document.title = 'Beveled – Classic Editor'
   }, [route])
 
   const onUpload = (blob: Blob) => {
@@ -307,7 +325,18 @@ function App() {
   }
 
   if (route === '/terms') return <TermsPage goTo={navigate} />
-  if (route === '/editor') return <Editor initialImageSource={initialImage} />
+  if (route === '/editor')
+    return (
+      <Suspense fallback={<EditorFallback />}>
+        <MockupEditor initialMedia={initialImage} />
+      </Suspense>
+    )
+  if (route === '/classic')
+    return (
+      <Suspense fallback={<EditorFallback />}>
+        <ClassicEditor initialImageSource={initialImage} />
+      </Suspense>
+    )
   return <HomePage onUpload={onUpload} goTo={navigate} />
 }
 
