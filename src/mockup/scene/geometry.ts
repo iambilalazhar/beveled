@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 
 /** Rounded rectangle path centred on the origin. */
@@ -70,9 +70,7 @@ export function useRoundedSlab(w: number, h: number, d: number, r: number, bevel
   return geometry
 }
 
+/** Disposes a geometry when it is replaced or the component unmounts. */
 function useDispose(geometry: THREE.BufferGeometry) {
-  // Dispose the previous geometry when a new one is created.
-  useMemo(() => geometry, [geometry])
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return geometry
+  useEffect(() => () => geometry.dispose(), [geometry])
 }

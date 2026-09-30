@@ -72,85 +72,136 @@ function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 export type MediaTexture = { texture: THREE.Texture; aspect: number; isPlaceholder: boolean }
 
-/** Loads the current media (image or video) into a texture. Falls back to the placeholder wallpaper. */
-export function useMediaTexture(media: MediaState, fallbackAspect: number): MediaTexture {
-  const [loaded, setLoaded] = useState<{ url: string; texture: THREE.Texture; aspect: number } | null>(null)
+type CacheEntry = {
+  url: string
+  kind: 'image' | 'video'
+  texture: THREE.Texture
+  aspect: number
+  video: HTMLVideoElement | null
+  lastUsed: number
+}
 
-  useEffect(() => {
-    if (!media.url) {
-      setLoaded(null)
-      return
+const cache = new Map<string, CacheEntry>()
+const pending = new Map<string, Promise<CacheEntry>>()
+const MAX_CACHE = 16
+
+function evict() {
+  if (cache.size <= MAX_CACHE) return
+  const entries = [...cache.values()].sort((a, b) => a.lastUsed - b.lastUsed)
+  for (const e of entries.slice(0, cache.size - MAX_CACHE)) {
+    e.texture.dispose()
+    if (e.video) {
+      e.video.pause()
+      e.video.removeAttribute('src')
+      e.video.load()
     }
-    let cancelled = false
-    let texture: THREE.Texture | null = null
-    let video: HTMLVideoElement | null = null
-    if (media.kind === 'video') {
-      video = document.createElement('video')
-      video.src = media.url
+    cache.delete(e.url)
+  }
+}
+
+/** Loads (or returns the cached) texture for an image or video URL. Shared across shots. */
+export function loadMediaTexture(url: string, kind: 'image' | 'video'): Promise<CacheEntry> {
+  const hit = cache.get(url)
+  if (hit) {
+    hit.lastUsed = performance.now()
+    return Promise.resolve(hit)
+  }
+  const inflight = pending.get(url)
+  if (inflight) return inflight
+  const promise = new Promise<CacheEntry>((resolve, reject) => {
+    if (kind === 'video') {
+      const video = document.createElement('video')
+      video.src = url
       video.crossOrigin = 'anonymous'
       video.loop = true
       video.muted = true
       video.playsInline = true
-      video.autoplay = true
+      video.preload = 'auto'
       const vt = new THREE.VideoTexture(video)
       vt.colorSpace = THREE.SRGBColorSpace
       vt.minFilter = THREE.LinearFilter
       vt.magFilter = THREE.LinearFilter
       vt.generateMipmaps = false
-      texture = vt
-      const onReady = () => {
-        if (cancelled || !video) return
-        setLoaded({ url: media.url!, texture: vt, aspect: video.videoWidth / Math.max(1, video.videoHeight) })
-        void video.play().catch(() => undefined)
-      }
-      video.addEventListener('loadedmetadata', onReady, { once: true })
+      video.addEventListener(
+        'loadeddata',
+        () => {
+          const entry: CacheEntry = { url, kind, texture: vt, aspect: video.videoWidth / Math.max(1, video.videoHeight), video, lastUsed: performance.now() }
+          cache.set(url, entry)
+          evict()
+          resolve(entry)
+        },
+        { once: true }
+      )
+      video.addEventListener('error', () => reject(new Error('Could not load video')), { once: true })
       video.load()
     } else {
       const img = new Image()
       img.crossOrigin = 'anonymous'
       img.onload = () => {
-        if (cancelled) return
         const t = new THREE.Texture(img)
         t.colorSpace = THREE.SRGBColorSpace
         t.anisotropy = 8
         t.generateMipmaps = true
         t.minFilter = THREE.LinearMipmapLinearFilter
         t.needsUpdate = true
-        texture = t
-        setLoaded({ url: media.url!, texture: t, aspect: img.naturalWidth / Math.max(1, img.naturalHeight) })
+        const entry: CacheEntry = { url, kind, texture: t, aspect: img.naturalWidth / Math.max(1, img.naturalHeight), video: null, lastUsed: performance.now() }
+        cache.set(url, entry)
+        evict()
+        resolve(entry)
       }
-      img.src = media.url
+      img.onerror = () => reject(new Error('Could not load image'))
+      img.src = url
     }
+  })
+  pending.set(url, promise)
+  promise.finally(() => pending.delete(url)).catch(() => undefined)
+  return promise
+}
+
+export function getCachedMedia(url: string | null | undefined) {
+  return url ? cache.get(url) : undefined
+}
+
+/** Loads the current media (image or video) into a texture. Falls back to the placeholder wallpaper. */
+export function useMediaTexture(media: MediaState, fallbackAspect: number): MediaTexture {
+  const [, force] = useState(0)
+  const url = media.url
+  const kind = media.kind === 'video' ? 'video' : 'image'
+  const entry = url ? cache.get(url) : undefined
+
+  useEffect(() => {
+    if (!url || cache.has(url)) return
+    let cancelled = false
+    loadMediaTexture(url, kind)
+      .then(() => !cancelled && force((n) => n + 1))
+      .catch(() => undefined)
     return () => {
       cancelled = true
-      if (video) {
-        video.pause()
-        video.removeAttribute('src')
-        video.load()
-      }
-      texture?.dispose()
     }
-  }, [media.url, media.kind])
+  }, [url, kind])
 
   return useMemo(() => {
-    if (loaded && loaded.url === media.url) {
-      return { texture: loaded.texture, aspect: loaded.aspect, isPlaceholder: false }
+    if (entry) {
+      entry.lastUsed = performance.now()
+      return { texture: entry.texture, aspect: entry.aspect, isPlaceholder: false }
     }
     return { texture: getPlaceholderTexture(fallbackAspect), aspect: fallbackAspect, isPlaceholder: true }
-  }, [loaded, media.url, fallbackAspect])
+  }, [entry, fallbackAspect])
 }
 
 export type FitResult = {
-  /** Plane size in local screen coordinates (x = short side in portrait). */
-  planeW: number
-  planeH: number
-  repeat: [number, number]
+  /** UV scale applied around the centre of the effective (post-rotation) screen. <1 crops (cover), >1 letterboxes (contain). */
+  fitScale: [number, number]
+  /** Rotation applied to the sampling coordinates so landscape media reads upright on a rotated device. */
   rotation: number
+  /** Effective screen size the media is fitted into (after rotation). */
+  effW: number
+  effH: number
 }
 
 /**
- * Computes how to place a media texture on a screen of `screenW`×`screenH`.
- * When `rotated` (landscape orientation of a portrait device) the image is rotated 90°.
+ * Computes how to sample a media texture onto a screen of `screenW`×`screenH`.
+ * When `rotated` (landscape orientation of a portrait device) the sampling frame is rotated 90°.
  */
 export function computeFit(
   screenW: number,
@@ -163,19 +214,15 @@ export function computeFit(
   const effH = rotated ? screenW : screenH
   const screenAspect = effW / effH
   const rotation = rotated ? -Math.PI / 2 : 0
-  if (fit === 'stretch') {
-    return { planeW: screenW, planeH: screenH, repeat: [1, 1], rotation }
-  }
+  const ma = mediaAspect || screenAspect
+  if (fit === 'stretch') return { fitScale: [1, 1], rotation, effW, effH }
   if (fit === 'contain') {
-    let fw = effW
-    let fh = effH
-    if (mediaAspect > screenAspect) fh = fw / mediaAspect
-    else fw = fh * mediaAspect
-    return { planeW: rotated ? fh : fw, planeH: rotated ? fw : fh, repeat: [1, 1], rotation }
+    return ma > screenAspect
+      ? { fitScale: [1, ma / screenAspect], rotation, effW, effH }
+      : { fitScale: [screenAspect / ma, 1], rotation, effW, effH }
   }
   // cover
-  if (mediaAspect > screenAspect) {
-    return { planeW: screenW, planeH: screenH, repeat: [screenAspect / mediaAspect, 1], rotation }
-  }
-  return { planeW: screenW, planeH: screenH, repeat: [1, mediaAspect / screenAspect], rotation }
+  return ma > screenAspect
+    ? { fitScale: [screenAspect / ma, 1], rotation, effW, effH }
+    : { fitScale: [1, ma / screenAspect], rotation, effW, effH }
 }
