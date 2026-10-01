@@ -31,7 +31,7 @@ export async function loadSlotFile(file: File, slot: 2 | 3) {
   }
 }
 
-function probeImage(url: string): Promise<{ width: number; height: number }> {
+export function probeImage(url: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
@@ -40,7 +40,7 @@ function probeImage(url: string): Promise<{ width: number; height: number }> {
   })
 }
 
-function probeVideo(url: string): Promise<{ width: number; height: number }> {
+export function probeVideo(url: string): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const video = document.createElement('video')
     video.preload = 'metadata'
@@ -132,8 +132,14 @@ export function usePasteMedia(loadFiles: (files: FileList | File[]) => void) {
 }
 
 /** Initial media: the extension's latest capture, or whatever the host app handed us. */
-export function useInitialMedia(initial: Blob | string | null | undefined, loadUrl: ReturnType<typeof useMediaLoader>['loadUrl'], loadBlob: ReturnType<typeof useMediaLoader>['loadBlob']) {
+export function useInitialMedia(
+  initial: Blob | string | null | undefined,
+  loadUrl: (url: string, kind: MediaKind, name: string | null) => unknown,
+  loadBlob: (blob: Blob) => unknown,
+  enabled = true
+) {
   useEffect(() => {
+    if (!enabled) return
     if (isExtensionRuntime()) {
       const ch = getChromeSafe()
       ch?.storage?.local.get('latestCapture', (res) => {

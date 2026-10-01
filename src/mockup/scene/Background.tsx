@@ -251,7 +251,7 @@ function useBlurredImage(url: string | null, blur: number) {
  * Full-screen background quad rendered inside the scene so it is part of every export
  * and every post-processing pass. Not rendered when the background is transparent.
  */
-export function Background({ bg }: { bg: BackgroundState }) {
+export function Background({ bg, time }: { bg: BackgroundState; /** Clock for animated backgrounds (defaults to the 3-D timeline). */ time?: () => number }) {
   const size = useThree((s) => s.size)
   const image = useBlurredImage(bg.kind === 'image' ? bg.image : null, bg.imageBlur)
   const material = useMemo(
@@ -299,7 +299,7 @@ export function Background({ bg }: { bg: BackgroundState }) {
   // Shader backgrounds animate with the timeline clock, so exports match the preview frame for frame.
   const speed = bg.speed
   useFrame(() => {
-    material.uniforms.time.value = useEditor.getState().time * speed * 2 + 10
+    material.uniforms.time.value = (time ? time() : useEditor.getState().time) * speed * 2 + 10
   })
 
   if (bg.kind === 'transparent') return null

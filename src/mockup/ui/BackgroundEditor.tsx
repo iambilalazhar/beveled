@@ -17,12 +17,15 @@ export function BackgroundEditor({
   onChange,
   paletteSource,
   allowTransparent = true,
+  compact = false,
 }: {
   bg: BackgroundState
   onChange: (patch: Partial<BackgroundState>) => void
   /** Image to sample the "From your media" palette from. */
   paletteSource?: string | null
   allowTransparent?: boolean
+  /** Hide the palette, preset and library grids (the 2-D studio shows its own). */
+  compact?: boolean
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<{ src: string; colors: string[] } | null>(null)
@@ -58,7 +61,7 @@ export function BackgroundEditor({
 
   return (
     <div className="space-y-5">
-      {suggestions.length > 0 && (
+      {!compact && suggestions.length > 0 && (
         <Section title="From your media">
           <TileGrid cols={6}>
             {suggestions.map((p, i) => (
@@ -75,7 +78,7 @@ export function BackgroundEditor({
         </Section>
       )}
 
-      <Section title="Presets" action={<Wand2 className="size-3 text-white/30" />}>
+      {!compact && <Section title="Presets" action={<Wand2 className="size-3 text-white/30" />}>
         <TileGrid cols={4}>
           {BACKGROUND_PRESETS.map((p) => (
             <Tile key={p.id} active={activePreset === p.id} onClick={() => onChange({ kind: p.kind, colors: p.colors, angle: p.angle })} title={p.label} className="h-11 p-1">
@@ -83,9 +86,9 @@ export function BackgroundEditor({
             </Tile>
           ))}
         </TileGrid>
-      </Section>
+      </Section>}
 
-      <Section title="Library">
+      {!compact && <Section title="Library">
         <div className="grid grid-cols-4 gap-1">
           {SHADER_PRESETS.map((p) => (
             <button
@@ -101,7 +104,7 @@ export function BackgroundEditor({
             </button>
           ))}
         </div>
-      </Section>
+      </Section>}
 
       <Section title="Type">
         <SegmentRow
