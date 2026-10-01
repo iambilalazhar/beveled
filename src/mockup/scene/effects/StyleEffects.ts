@@ -193,13 +193,38 @@ const lightShadowShader = /* glsl */ `
       float area = smoothstep(0.62 + soft, 0.62 - soft, max(abs(g.x), abs(g.y) * 1.2));
       light = bars * area;
     } else if (pattern == 2) {
-      // Dappled leaves that sway over time: warped noise with a sharp threshold reads as foliage
-      vec2 w = q * 5.5 + vec2(sin(uTime * 0.6) * 0.1, cos(uTime * 0.45) * 0.08);
-      vec2 warp = vec2(fbm(w * 0.6 + 3.1), fbm(w * 0.6 + 7.7));
-      float n = fbm(w + warp * 1.6);
-      float holes = fbm(w * 2.3 + warp);
-      light = smoothstep(0.52 - soft * 0.6, 0.52 + soft * 0.6, n) * smoothstep(0.35, 0.35 + soft + 0.05, holes) + smoothstep(0.62, 0.7, holes) * 0.5;
-      light = clamp(light, 0.0, 1.0);
+      // Leaves: pointed leaf shapes scattered on a jittered grid (two layers for depth), swaying gently
+      float shadow = 0.0;
+      for (int layer = 0; layer < 2; layer++) {
+        float fl = float(layer);
+        float scale = 3.2 + fl * 2.1;
+        vec2 g = q * scale + vec2(fl * 7.3, fl * 3.1) + vec2(sin(uTime * 0.5 + fl) * 0.06, cos(uTime * 0.4) * 0.05);
+        vec2 cell = floor(g);
+        float dmin = 1e3;
+        for (int j = -1; j <= 1; j++) {
+          for (int i = -1; i <= 1; i++) {
+            vec2 c = cell + vec2(float(i), float(j));
+            float h1 = hash(c + fl * 13.0);
+            if (h1 < 0.2) continue;
+            vec2 center = c + vec2(hash(c + 1.7), hash(c + 4.3));
+            float ang = hash(c + 9.1) * 6.2831 + sin(uTime * 0.6 + h1 * 6.0) * 0.08;
+            vec2 d = g - center;
+            d = mat2(cos(ang), -sin(ang), sin(ang), cos(ang)) * d;
+            float len = 0.42 + hash(c + 2.9) * 0.3;
+            float wid = len * (0.32 + hash(c + 5.5) * 0.12);
+            // Vesica (two-circle) leaf with pointed tips along x
+            float r = (len * len + wid * wid) / (2.0 * wid);
+            vec2 pa = abs(d);
+            float leaf = length(vec2(pa.x, pa.y + r - wid)) - r;
+            // Stem
+            float stem = max(abs(d.y) - 0.012, abs(d.x + len * 0.5 + 0.12) - 0.14);
+            dmin = min(dmin, min(leaf, stem));
+          }
+        }
+        float s2 = soft * (1.0 + fl * 1.5) * scale * 0.4 + 0.01;
+        shadow = max(shadow, (1.0 - smoothstep(-s2, s2, dmin)) * (1.0 - fl * 0.35));
+      }
+      light = 1.0 - shadow;
     } else {
       // Palm fronds: drooping spines with tapering, angled leaflets, radiating from beyond the top-left corner
       float shadow = 0.0;
