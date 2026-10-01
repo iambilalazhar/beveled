@@ -3,7 +3,7 @@ import { Component, Suspense, useEffect, useMemo, type ReactNode } from 'react'
 import * as THREE from 'three'
 import type { DeviceState } from '../types'
 import { getPlaceholderTexture, useMediaTexture } from './media'
-import { useShotScene } from './shotContext'
+import { useSlotMedia } from './deviceSlot'
 
 const SCREEN_NAME = /screen|display|lcd|monitor|panel/i
 const TARGET = 1.6
@@ -38,7 +38,7 @@ function findScreen(root: THREE.Object3D): THREE.Mesh | null {
 
 function Model({ url, device }: { url: string; device: DeviceState }) {
   const gltf = useGLTF(url)
-  const media = useShotScene('media')
+  const media = useSlotMedia()
   const { texture, aspect } = useMediaTexture(media, 16 / 10)
 
   // Clone so the cached glTF scene can be reused, normalise size and centre it on the origin.

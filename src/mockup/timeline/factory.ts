@@ -28,7 +28,7 @@ export function mergeShotScene(base: ShotScene, patch: ScenePatch | undefined): 
   return next
 }
 
-const DARK_BG: BackgroundState = { kind: 'solid', colors: ['#0a0a0a'], angle: 0, noise: 0, image: null, imageBlur: 0.4 }
+const DARK_BG: BackgroundState = { kind: 'solid', colors: ['#0a0a0a'], angle: 0, noise: 0, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.3 }
 
 export const DEFAULT_TEXT: TextState = {
   text: 'Your text here',

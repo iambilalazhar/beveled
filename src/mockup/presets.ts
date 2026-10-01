@@ -1,9 +1,11 @@
 import type {
   AspectId,
   DeviceKind,
+  EnvironmentId,
   FinishId,
   LightPresetId,
   SceneState,
+  ShaderBgId,
   Template,
 } from './types'
 
@@ -230,6 +232,121 @@ export const BACKGROUND_PRESETS: BackgroundPreset[] = [
   { id: 'white', label: 'White', kind: 'solid', colors: ['#ffffff'], angle: 0 },
 ]
 
+/** Animated procedural backgrounds. Thumbnails live in /public/backgrounds/<id>.jpg. */
+export type ShaderPreset = { id: string; label: string; shader: ShaderBgId; colors: string[]; speed: number }
+
+export const SHADER_PRESETS: ShaderPreset[] = [
+  { id: 'aurora', label: 'Aurora', shader: 'aurora', colors: ['#050816', '#22d3a6', '#7c3aed'], speed: 0.3 },
+  { id: 'borealis', label: 'Borealis', shader: 'aurora', colors: ['#0b0614', '#e05d38', '#f59e0b'], speed: 0.3 },
+  { id: 'silk', label: 'Silk', shader: 'silk', colors: ['#1e1b4b', '#7c3aed', '#f0abfc'], speed: 0.25 },
+  { id: 'satin', label: 'Satin', shader: 'silk', colors: ['#e7e5e4', '#fafaf9', '#d6d3d1'], speed: 0.2 },
+  { id: 'mesh', label: 'Mesh', shader: 'mesh', colors: ['#fb7185', '#818cf8', '#fcd34d'], speed: 0.4 },
+  { id: 'lagoon-mesh', label: 'Lagoon', shader: 'mesh', colors: ['#0ea5e9', '#14b8a6', '#1e3a8a'], speed: 0.4 },
+  { id: 'waves', label: 'Waves', shader: 'waves', colors: ['#0f172a', '#334155', '#e05d38'], speed: 0.35 },
+  { id: 'pastel-waves', label: 'Pastel', shader: 'waves', colors: ['#fde68a', '#fbcfe8', '#c4b5fd'], speed: 0.35 },
+  { id: 'prism', label: 'Prism', shader: 'prism', colors: ['#020617', '#111827', '#ffffff'], speed: 0.3 },
+  { id: 'chrome', label: 'Chrome', shader: 'chrome', colors: ['#0a0a0a', '#d4d4d8', '#93c5fd'], speed: 0.25 },
+  { id: 'gold', label: 'Gold', shader: 'chrome', colors: ['#1c1206', '#f5c26b', '#fff7e6'], speed: 0.25 },
+  { id: 'dunes', label: 'Dunes', shader: 'dunes', colors: ['#7c2d12', '#fb923c', '#fde68a'], speed: 0.2 },
+  { id: 'night-dunes', label: 'Night dunes', shader: 'dunes', colors: ['#020617', '#1e293b', '#6366f1'], speed: 0.2 },
+  { id: 'swirl', label: 'Swirl', shader: 'swirl', colors: ['#0c0a09', '#e05d38', '#fde047'], speed: 0.3 },
+  { id: 'bokeh', label: 'Bokeh', shader: 'bokeh', colors: ['#0b1020', '#f59e0b', '#ec4899'], speed: 0.3 },
+  { id: 'grain', label: 'Grain', shader: 'grain', colors: ['#f97316', '#db2777', '#4f46e5'], speed: 0.2 },
+]
+
+/* ------------------------------------------------------------------ */
+/* Environments (3-D sets)                                             */
+/* ------------------------------------------------------------------ */
+
+export type SurfaceKind = 'concrete' | 'wood' | 'grid' | 'matte' | 'plaster'
+
+export type EnvironmentPreset = {
+  id: EnvironmentId
+  label: string
+  description: string
+  floor: { surface: SurfaceKind; color: string; roughness: number; metalness: number; scale: number }
+  wall: { surface: SurfaceKind; color: string; roughness: number }
+  /** Colour behind the set; the floor and wall fade into it. */
+  backdrop: string
+  /** Radius of the cove between floor and wall, relative to the device size (0 = sharp corner). */
+  cove: number
+  /** Lighting preset applied when the set is picked. */
+  lighting: LightPresetId
+  /** Swatch for the picker. */
+  swatch: string
+}
+
+export const ENVIRONMENTS: EnvironmentPreset[] = [
+  {
+    id: 'concrete-desk',
+    label: 'Concrete desk',
+    description: 'Pale polished concrete and a plaster wall',
+    floor: { surface: 'concrete', color: '#bdb8b1', roughness: 0.62, metalness: 0, scale: 1 },
+    wall: { surface: 'plaster', color: '#d9d4cd', roughness: 0.9 },
+    backdrop: '#cdc8c1',
+    cove: 0.05,
+    lighting: 'soft',
+    swatch: 'linear-gradient(180deg,#ddd8d1 0 55%,#a9a49d 55%)',
+  },
+  {
+    id: 'wood-desk',
+    label: 'Oak desk',
+    description: 'Warm oak desk against a linen wall',
+    floor: { surface: 'wood', color: '#8a6440', roughness: 0.48, metalness: 0, scale: 1 },
+    wall: { surface: 'plaster', color: '#e8e1d6', roughness: 0.92 },
+    backdrop: '#ddd5c8',
+    cove: 0.04,
+    lighting: 'sunset',
+    swatch: 'linear-gradient(180deg,#ebe4d9 0 55%,#8a6440 55%)',
+  },
+  {
+    id: 'dark-room',
+    label: 'Dark room',
+    description: 'Glossy black floor, moody rim light',
+    floor: { surface: 'matte', color: '#141416', roughness: 0.32, metalness: 0, scale: 1 },
+    wall: { surface: 'matte', color: '#0b0b0d', roughness: 0.8 },
+    backdrop: '#050506',
+    cove: 0.6,
+    lighting: 'dramatic',
+    swatch: 'linear-gradient(180deg,#0b0b0d 0 55%,#202024 55%)',
+  },
+  {
+    id: 'dark-grid',
+    label: 'Dark grid',
+    description: 'Black studio floor with a fine grid',
+    floor: { surface: 'grid', color: '#0b0b0e', roughness: 0.62, metalness: 0, scale: 1 },
+    wall: { surface: 'grid', color: '#08080a', roughness: 0.7 },
+    backdrop: '#040405',
+    cove: 1.2,
+    lighting: 'cool',
+    swatch: 'repeating-linear-gradient(0deg,#2a2a33 0 1px,transparent 1px 8px),repeating-linear-gradient(90deg,#2a2a33 0 1px,#0a0a0d 1px 8px)',
+  },
+  {
+    id: 'concrete-dark',
+    label: 'Concrete dark',
+    description: 'Raw dark concrete, soft top light',
+    floor: { surface: 'concrete', color: '#3d3d40', roughness: 0.75, metalness: 0, scale: 1.4 },
+    wall: { surface: 'concrete', color: '#2e2e31', roughness: 0.85 },
+    backdrop: '#1c1c1f',
+    cove: 0.05,
+    lighting: 'top',
+    swatch: 'linear-gradient(180deg,#2e2e31 0 55%,#4a4a4e 55%)',
+  },
+  {
+    id: 'bright-studio',
+    label: 'Bright studio',
+    description: 'Seamless white cyclorama',
+    floor: { surface: 'matte', color: '#f1f1f1', roughness: 0.85, metalness: 0, scale: 1 },
+    wall: { surface: 'matte', color: '#f4f4f4', roughness: 0.9 },
+    backdrop: '#f2f2f2',
+    cove: 2.4,
+    lighting: 'soft',
+    swatch: 'radial-gradient(circle at 50% 70%,#ffffff,#dcdcdc)',
+  },
+]
+
+export const ENVIRONMENT_BY_ID: Partial<Record<EnvironmentId, EnvironmentPreset>> = Object.fromEntries(ENVIRONMENTS.map((e) => [e.id, e]))
+
 /* ------------------------------------------------------------------ */
 /* Camera presets                                                      */
 /* ------------------------------------------------------------------ */
@@ -311,6 +428,7 @@ export const DEFAULT_SCENE: SceneState = {
     rotateY: 0,
     screenBg: '#000000',
     screenPadding: 0,
+    scroll: 0,
     browserStyle: 'safari',
     browserDark: true,
     browserUrl: 'beveled.app',
@@ -320,7 +438,7 @@ export const DEFAULT_SCENE: SceneState = {
     customModelName: null,
   },
   camera: { yaw: -24, pitch: 14, roll: 0, fov: 32, zoom: 1, panX: 0, panY: 0 },
-  background: { kind: 'radial', colors: ['#2a2a30', '#0a0a0c'], angle: 0, noise: 0, image: null, imageBlur: 0.4 },
+  background: { kind: 'radial', colors: ['#2a2a30', '#0a0a0c'], angle: 0, noise: 0, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.3 },
   lighting: {
     preset: 'studio',
     intensity: 1,
@@ -365,10 +483,26 @@ export const DEFAULT_SCENE: SceneState = {
     midtones: 0,
     highlights: 0,
     fisheye: 0,
+    bloomRadius: 0.6,
+    glassBorder: 0,
+    pixelGrid: 0,
+    screenFade: 0,
+    screenFadeAngle: 135,
+    screenFadeSoftness: 0.5,
+    liquidGlass: 0,
+    liquidGlassShine: 0.3,
+    liquidGlassTarget: 'frame',
+    lightShadow: 0,
+    lightShadowPattern: 'blinds',
+    lightShadowAngle: 24,
+    lightShadowSoftness: 0.5,
+    hidden: [],
   },
   motion: { enabled: false, kind: 'float', speed: 1, intensity: 0.5, duration: 5 },
+  environment: { kind: 'none', wall: 1, depth: 1, fog: 0.5 },
+  group: { count: 1, arrangement: 'fan', spacing: 0.5, media2: null, media3: null },
   frame: { aspect: 'auto', customWidth: 1920, customHeight: 1080 },
-  export: { format: 'png', scale: 2, quality: 0.92, transparent: false, fps: 30, videoFormat: 'mp4', videoHeight: 1080, videoBitrate: 12 },
+  export: { format: 'png', scale: 2, quality: 0.92, transparent: false, fps: 30, videoFormat: 'mp4', videoHeight: 1080, videoBitrate: 12, motionBlur: 1, videoAlpha: false },
 }
 
 /* ------------------------------------------------------------------ */
@@ -379,6 +513,90 @@ const HERO = { yaw: -24, pitch: 12, roll: 0, fov: 32, zoom: 1, panX: 0, panY: 0 
 
 export const TEMPLATES: Template[] = [
   /* ---------------- animated (multi-clip) ---------------- */
+  {
+    id: 'aurora-launch',
+    name: 'Aurora Launch',
+    tag: 'Animated · 12s',
+    animated: true,
+    description: 'Three iPhones on a moving aurora, a title, then a laptop in a dark room',
+    preview: { background: 'linear-gradient(180deg,#050816,#0f3b3a,#3b1d6e)', deviceKind: 'phone' },
+    scene: { frame: { aspect: '16:9' } },
+    clips: [
+      {
+        kind: 'shot',
+        preset: 'push-in',
+        scene: {
+          device: { kind: 'phone', model: 'iphone-17-pro', finish: 'silver' },
+          group: { count: 3, arrangement: 'fan', spacing: 0.4 },
+          camera: { ...HERO, yaw: 0, pitch: 6, fov: 30 },
+          background: { kind: 'shader', shader: 'aurora', colors: ['#050816', '#22d3a6', '#7c3aed'], speed: 0.4 },
+          lighting: { preset: 'cool', shadow: true },
+          effects: { vignette: 0.3, bloom: 0.2, grain: 0.06 },
+        },
+        transitionOut: 'fade',
+      },
+      {
+        kind: 'text',
+        duration: 3,
+        text: {
+          text: 'Meet {the new app|your next launch}',
+          size: 6.5,
+          background: { kind: 'shader', colors: ['#050816', '#22d3a6', '#7c3aed'], angle: 0, noise: 0, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.4 },
+          enter: { per: 'word', duration: 1, effect: 'blur-scale-up' },
+        },
+        transitionIn: 'fade',
+        transitionOut: 'fade',
+      },
+      {
+        kind: 'shot',
+        preset: 'scan-lr',
+        scene: {
+          device: { kind: 'laptop', model: 'macbook-pro-16', finish: 'space-black', lidAngle: 108 },
+          environment: { kind: 'dark-room', wall: 1, depth: 1, fog: 0.6 },
+          lighting: { preset: 'dramatic', shadow: true },
+          effects: { vignette: 0.4, bloom: 0.15 },
+        },
+        transitionIn: 'fade',
+        transitionOut: 'fade',
+      },
+    ],
+  },
+  {
+    id: 'desk-story',
+    name: 'Desk Story',
+    tag: 'Animated · 10s',
+    animated: true,
+    description: 'Sunlit oak desk, a lid that folds open, then your logo',
+    preview: { background: 'linear-gradient(180deg,#ebe4d9,#8a6440)', deviceKind: 'laptop' },
+    scene: { frame: { aspect: '16:9' } },
+    clips: [
+      {
+        kind: 'shot',
+        preset: 'fold-up',
+        scene: {
+          device: { kind: 'laptop', model: 'macbook-air-13', finish: 'starlight', lidAngle: 100 },
+          environment: { kind: 'wood-desk', wall: 1, depth: 0.8, fog: 0.5 },
+          lighting: { preset: 'sunset', shadow: true },
+          effects: { lightShadow: 0.45, lightShadowPattern: 'blinds', lightShadowAngle: 28, vignette: 0.2 },
+        },
+        transitionOut: 'fade',
+      },
+      {
+        kind: 'shot',
+        preset: 'slow-zoom-out',
+        scene: {
+          device: { kind: 'laptop', model: 'macbook-air-13', finish: 'starlight', lidAngle: 104 },
+          camera: { ...HERO, yaw: 28, pitch: 10, fov: 30 },
+          environment: { kind: 'wood-desk', wall: 1, depth: 0.8, fog: 0.5 },
+          lighting: { preset: 'sunset', shadow: true },
+          effects: { lightShadow: 0.45, lightShadowPattern: 'leaves', vignette: 0.2 },
+        },
+        transitionIn: 'fade',
+        transitionOut: 'fade',
+      },
+      { kind: 'logo', duration: 2.5, logo: { scale: 4, effect: 'none', background: { kind: 'solid', colors: ['#ebe4d9'], angle: 0, noise: 0.1, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.3 } }, transitionIn: 'fade', transitionOut: 'fade' },
+    ],
+  },
   {
     id: 'product-launch',
     name: 'Product Launch',
@@ -451,7 +669,7 @@ export const TEMPLATES: Template[] = [
       {
         kind: 'text',
         duration: 3,
-        text: { text: 'Available now\non the App Store', size: 5, background: { kind: 'linear', colors: ['#0f172a', '#4c1d95'], angle: 135, noise: 0, image: null, imageBlur: 0.4 }, enter: { per: 'line', duration: 1, effect: 'fade-up' } },
+        text: { text: 'Available now\non the App Store', size: 5, background: { kind: 'linear', colors: ['#0f172a', '#4c1d95'], angle: 135, noise: 0, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.3 }, enter: { per: 'line', duration: 1, effect: 'fade-up' } },
         transitionIn: 'fade',
       },
     ],
@@ -523,7 +741,7 @@ export const TEMPLATES: Template[] = [
         },
         transitionOut: 'fade',
       },
-      { kind: 'logo', duration: 2.5, logo: { scale: 3.5, effect: 'heatmap', background: { kind: 'radial', colors: ['#0f1a3a', '#020617'], angle: 0, noise: 0, image: null, imageBlur: 0.4 } }, transitionIn: 'fade' },
+      { kind: 'logo', duration: 2.5, logo: { scale: 3.5, effect: 'heatmap', background: { kind: 'radial', colors: ['#0f1a3a', '#020617'], angle: 0, noise: 0, image: null, imageBlur: 0.4, shader: 'aurora', speed: 0.3 } }, transitionIn: 'fade' },
     ],
   },
 
@@ -680,6 +898,91 @@ export const TEMPLATES: Template[] = [
       depth: { mode: 'lens', autoFocus: true, focalLength: 0.6, bokeh: 1 },
       effects: { vignette: 0.45, bloom: 0.3, grain: 0.1 },
       frame: { aspect: '4:5' },
+    },
+  },
+  {
+    id: 'concrete-macbook',
+    name: 'Concrete MacBook',
+    tag: 'Environment',
+    description: 'MacBook Pro on a pale concrete desk',
+    preview: { background: 'linear-gradient(180deg,#ddd8d1,#a9a49d)', deviceKind: 'laptop' },
+    scene: {
+      device: { kind: 'laptop', model: 'macbook-pro-14', finish: 'silver', lidAngle: 106 },
+      camera: { ...HERO, yaw: -30, pitch: 14, fov: 30, zoom: 1.05 },
+      environment: { kind: 'concrete-desk', wall: 1, depth: 0.9, fog: 0.5 },
+      lighting: { preset: 'soft', shadow: true, shadowOpacity: 0.6 },
+      effects: { vignette: 0.15 },
+    },
+  },
+  {
+    id: 'dark-room-macbook',
+    name: 'Dark Room',
+    tag: 'Environment',
+    description: 'Glossy black room with a rim light',
+    preview: { background: 'linear-gradient(180deg,#0b0b0d,#202024)', deviceKind: 'laptop' },
+    scene: {
+      device: { kind: 'laptop', model: 'macbook-pro-16', finish: 'space-black', lidAngle: 108 },
+      camera: { ...HERO, yaw: 26, pitch: 10, fov: 30 },
+      environment: { kind: 'dark-room', wall: 1, depth: 1, fog: 0.6 },
+      lighting: { preset: 'dramatic', shadow: true },
+      effects: { vignette: 0.45, bloom: 0.2 },
+    },
+  },
+  {
+    id: 'iphone-trio',
+    name: 'iPhone Trio',
+    tag: 'Multi-device',
+    description: 'Three iPhones fanned over a mesh gradient',
+    preview: { background: 'linear-gradient(135deg,#fb7185,#818cf8,#fcd34d)', deviceKind: 'phone' },
+    scene: {
+      device: { kind: 'phone', model: 'iphone-17-pro', finish: 'cosmic-orange' },
+      group: { count: 3, arrangement: 'fan', spacing: 0.35 },
+      camera: { ...HERO, yaw: 0, pitch: 4, fov: 28, zoom: 0.95 },
+      background: { kind: 'shader', shader: 'mesh', colors: ['#fb7185', '#818cf8', '#fcd34d'], speed: 0.4 },
+      lighting: { preset: 'soft', shadow: true },
+      effects: { vignette: 0.1 },
+    },
+  },
+  {
+    id: 'studio-duo',
+    name: 'Studio Duo',
+    tag: 'Multi-device',
+    description: 'Two iPhones side by side in a white cyclorama',
+    preview: { background: 'radial-gradient(circle at 50% 70%,#ffffff,#dcdcdc)', deviceKind: 'phone' },
+    scene: {
+      device: { kind: 'phone', model: 'iphone-17', finish: 'white' },
+      group: { count: 2, arrangement: 'tilt', spacing: 0.4 },
+      camera: { ...HERO, yaw: -12, pitch: 8, fov: 28 },
+      environment: { kind: 'bright-studio', wall: 1, depth: 1, fog: 0.4 },
+      lighting: { preset: 'soft', shadow: true, shadowOpacity: 0.5 },
+    },
+  },
+  {
+    id: 'sunlit-phone',
+    name: 'Sunlit',
+    tag: 'Light shadow',
+    description: 'Palm shadows across a warm backdrop',
+    preview: { background: 'linear-gradient(135deg,#f5e6d3,#e8d5bd)', deviceKind: 'phone' },
+    scene: {
+      device: { kind: 'phone', model: 'iphone-air', finish: 'light-gold' },
+      camera: { ...HERO, yaw: -18, pitch: 6, roll: -6, fov: 28, zoom: 1.05 },
+      background: { kind: 'solid', colors: ['#efe2d0'], noise: 0.08 },
+      lighting: { preset: 'sunset', shadow: true, shadowOpacity: 0.45 },
+      effects: { lightShadow: 0.55, lightShadowPattern: 'palm', lightShadowSoftness: 0.45, vignette: 0.1 },
+    },
+  },
+  {
+    id: 'liquid-glass',
+    name: 'Liquid Glass',
+    tag: 'Effects',
+    description: 'Glass iPhone on a prism, with a liquid glass frame',
+    preview: { background: 'linear-gradient(135deg,#020617,#312e81,#0ea5e9)', deviceKind: 'phone' },
+    scene: {
+      device: { kind: 'phone', model: 'iphone-17-pro', finish: 'mist-blue' },
+      camera: { ...HERO, yaw: -26, pitch: 8, fov: 28 },
+      background: { kind: 'shader', shader: 'prism', colors: ['#020617', '#111827', '#ffffff'], speed: 0.3 },
+      lighting: { preset: 'neon', shadow: false },
+      effects: { glassBorder: 2.5, bloom: 0.3, vignette: 0.2 },
     },
   },
 ]

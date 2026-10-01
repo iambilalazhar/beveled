@@ -1,9 +1,12 @@
+import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import type { ScreenFit } from '../types'
 import { useRoundedPlane } from './geometry'
 import { computeFit, useMediaTexture } from './media'
-import { useShotScene } from './shotContext'
+import { useSlotMedia } from './deviceSlot'
+import { effectOn } from './effectState'
+import { sampleNow, useShotClip, useShotScene } from './shotContext'
 
 const vertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -21,6 +24,10 @@ const fragmentShader = /* glsl */ `
   uniform float rot;
   uniform float inset;
   uniform vec3 letterbox;
+  uniform float scroll;
+  uniform float fade;
+  uniform float fadeAngle;
+  uniform float fadeSoftness;
   varying vec2 vUv;
   void main() {
     vec2 p = (vUv - 0.5) * planeSize;
@@ -31,11 +38,20 @@ const fragmentShader = /* glsl */ `
     float pad = inset * min(effSize.x, effSize.y);
     vec2 inner = max(effSize - 2.0 * pad, vec2(1e-3));
     vec2 q = (p / inner) * fitScale + 0.5;
+    // Media taller than the screen scrolls: 0 shows the top, 1 the bottom.
+    if (fitScale.y < 1.0) q.y += (0.5 - fitScale.y * 0.5) * (1.0 - 2.0 * scroll);
     vec4 color;
     if (q.x < 0.0 || q.x > 1.0 || q.y < 0.0 || q.y > 1.0) {
       color = vec4(letterbox, 1.0);
     } else {
       color = texture2D(map, q);
+    }
+    if (fade > 0.0) {
+      vec2 dir = vec2(cos(fadeAngle), sin(fadeAngle));
+      vec2 pn = vUv - 0.5;
+      float t = 0.5 + dot(pn, dir) / max(1e-3, abs(dir.x) + abs(dir.y));
+      float f = fade * smoothstep(1.0 - fadeSoftness - 0.2, 1.0, t);
+      color.rgb = mix(color.rgb, letterbox, clamp(f, 0.0, 1.0));
     }
     gl_FragColor = vec4(color.rgb, 1.0);
     #include <colorspace_fragment>
@@ -122,8 +138,10 @@ function topLuminance(image: unknown): number {
  * glass layer that catches environment reflections.
  */
 export function DeviceScreen({ width, height, radius, rotated, fit, glare, position = [0, 0, 0], rotation = [0, 0, 0], statusBar = false }: DeviceScreenProps) {
-  const media = useShotScene('media')
+  const media = useSlotMedia()
   const device = useShotScene('device')
+  const fx = useShotScene('effects')
+  const clip = useShotClip()
   const fallbackAspect = rotated ? height / width : width / height
   const { texture, aspect, isPlaceholder } = useMediaTexture(media, fallbackAspect)
   const geometry = useRoundedPlane(width, height, radius)
@@ -142,6 +160,10 @@ export function DeviceScreen({ width, height, radius, rotated, fit, glare, posit
           rot: { value: 0 },
           inset: { value: 0 },
           letterbox: { value: new THREE.Color('#000000') },
+          scroll: { value: 0 },
+          fade: { value: 0 },
+          fadeAngle: { value: 0 },
+          fadeSoftness: { value: 0.5 },
         },
         toneMapped: false,
       }),
@@ -162,6 +184,12 @@ export function DeviceScreen({ width, height, radius, rotated, fit, glare, posit
   material.uniforms.rot.value = fitResult.rotation
   material.uniforms.inset.value = device.screenPadding
   material.uniforms.letterbox.value.set(device.screenBg)
+  material.uniforms.fade.value = effectOn(fx, 'screenFade', fx.screenFade) ? fx.screenFade : 0
+  material.uniforms.fadeAngle.value = THREE.MathUtils.degToRad(fx.screenFadeAngle)
+  material.uniforms.fadeSoftness.value = fx.screenFadeSoftness
+  useFrame(() => {
+    material.uniforms.scroll.value = THREE.MathUtils.clamp(sampleNow(clip, 'device.scroll'), 0, 1)
+  })
 
   const barH = width * 0.13
   const darkText = useMemo(() => (isPlaceholder ? false : topLuminance(texture.image) > 0.6), [texture, isPlaceholder])

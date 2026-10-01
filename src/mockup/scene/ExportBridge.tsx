@@ -1,5 +1,5 @@
 import { useThree } from '@react-three/fiber'
-import { AudioBufferSource, BufferTarget, CanvasSource, getFirstEncodableAudioCodec, getFirstEncodableVideoCodec, Mp4OutputFormat, Output, QUALITY_HIGH, WebMOutputFormat } from 'mediabunny'
+import type { AudioBufferSource as AudioBufferSourceT, BufferTarget as BufferTargetT } from 'mediabunny'
 import { useEffect } from 'react'
 import * as THREE from 'three'
 import { activeClip, useEditor } from '../store'
@@ -136,6 +136,8 @@ export function ExportBridge() {
     /* Frame-accurate path: WebCodecs via mediabunny */
     const runTimeline = async (): Promise<boolean> => {
       if (typeof VideoEncoder === 'undefined') return false
+      // Loaded on demand: the encoder library is only needed when exporting video.
+      const { AudioBufferSource, BufferTarget, CanvasSource, getFirstEncodableAudioCodec, getFirstEncodableVideoCodec, Mp4OutputFormat, Output, QUALITY_HIGH, WebMOutputFormat } = await import('mediabunny')
       const s = useEditor.getState()
       const project = s.project
       const fps = project.export.fps
@@ -144,8 +146,12 @@ export function ExportBridge() {
       const outH = even(project.export.videoHeight)
       const outW = even((outH * size.width) / Math.max(1, size.height))
       const format = project.export.videoFormat === 'webm' ? new WebMOutputFormat() : new Mp4OutputFormat({ fastStart: 'in-memory' })
-      const videoCodec = await getFirstEncodableVideoCodec(format.getSupportedVideoCodecs(), { width: outW, height: outH })
+      // Alpha needs VP9 in WebM and a transparent background.
+      const alpha = project.export.videoFormat === 'webm' && project.export.videoAlpha && project.export.transparent
+      const codecs = alpha ? format.getSupportedVideoCodecs().filter((c) => c === 'vp9') : format.getSupportedVideoCodecs()
+      const videoCodec = await getFirstEncodableVideoCodec(codecs, { width: outW, height: outH })
       if (!videoCodec) return false
+      const samples = Math.max(1, Math.round(project.export.motionBlur))
 
       setStatus('Preparing media…')
       // Preload everything the timeline shows so no frame renders a placeholder.
@@ -163,11 +169,16 @@ export function ExportBridge() {
       frameCanvas.height = outH
       const fctx = frameCanvas.getContext('2d')!
       const output = new Output({ format, target: new BufferTarget() })
-      const videoSource = new CanvasSource(frameCanvas, { codec: videoCodec, bitrate: project.export.videoBitrate * 1_000_000, keyFrameInterval: 2 })
+      const videoSource = new CanvasSource(frameCanvas, {
+        codec: videoCodec,
+        bitrate: project.export.videoBitrate * 1_000_000,
+        keyFrameInterval: 2,
+        ...(alpha ? { alpha: 'keep' as const } : {}),
+      })
       output.addVideoTrack(videoSource, { frameRate: fps })
 
       let audioBuffer: AudioBuffer | null = null
-      let audioSource: AudioBufferSource | null = null
+      let audioSource: AudioBufferSourceT | null = null
       if (project.audio.url) {
         try {
           const audioCodec = await getFirstEncodableAudioCodec(format.getSupportedAudioCodecs())
@@ -185,8 +196,12 @@ export function ExportBridge() {
 
       const prevDpr = gl.getPixelRatio()
       const prevTime = s.time
+      const prevClear = new THREE.Color()
+      gl.getClearColor(prevClear)
+      const prevAlpha = gl.getClearAlpha()
       setFrameloop('never')
       gl.setPixelRatio(outH / Math.max(1, size.height))
+      if (alpha) gl.setClearColor(0x000000, 0)
       let lastClipId = ''
       try {
         for (let i = 0; i < frames; i++) {
@@ -221,8 +236,21 @@ export function ExportBridge() {
               entry.texture.needsUpdate = true
             }
           }
-          advance(performance.now(), true)
-          fctx.drawImage(gl.domElement, 0, 0, outW, outH)
+          fctx.clearRect(0, 0, outW, outH)
+          if (samples > 1) {
+            // Motion blur: average sub-frames spread over half a frame (a 180° shutter).
+            for (let j = 0; j < samples; j++) {
+              const st2 = Math.min(total - 1e-4, Math.max(0, t + ((j + 0.5) / samples - 0.5) * (0.5 / fps)))
+              useEditor.getState().setTimeFromPlayback(st2)
+              advance(performance.now(), true)
+              fctx.globalAlpha = 1 / (j + 1)
+              fctx.drawImage(gl.domElement, 0, 0, outW, outH)
+            }
+            fctx.globalAlpha = 1
+          } else {
+            advance(performance.now(), true)
+            fctx.drawImage(gl.domElement, 0, 0, outW, outH)
+          }
           await videoSource.add(i / fps, 1 / fps)
           if (i % 5 === 0) {
             const p = (i + 1) / frames
@@ -238,13 +266,14 @@ export function ExportBridge() {
         }
         setStatus('Finalizing video…')
         await output.finalize()
-        const buffer = (output.target as BufferTarget).buffer
+        const buffer = (output.target as BufferTargetT).buffer
         if (!buffer) throw new Error('Encoder produced no data')
         const ext = format.fileExtension
         downloadBlob(new Blob([buffer], { type: format.mimeType }), `beveled-${stamp()}${ext}`)
         finish(`Saved ${outW}×${outH} ${ext.slice(1).toUpperCase()} · ${total.toFixed(1)}s`)
       } finally {
         gl.setPixelRatio(prevDpr)
+        gl.setClearColor(prevClear, prevAlpha)
         setFrameloop('always')
         for (const c of project.clips) {
           if (c.kind === 'shot' && c.scene.media.kind === 'video') {

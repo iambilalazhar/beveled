@@ -5,9 +5,12 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { fadeAmount } from '../timeline/evaluate'
 import type { Clip, ShotClip } from '../timeline/types'
+import type { EffectId, EffectsState } from '../types'
+import { useEditor } from '../store'
 import { FocusBlurEffect, type FocusBlurMode } from './effects/FocusBlurEffect'
 import { FadeEffect, FisheyeEffect, GradeEffect } from './effects/GradeEffects'
 import { SharpenEffect } from './effects/SharpenEffect'
+import { GlassFrameEffect, glassBorderParams, LightShadowEffect, liquidGlassParams, PixelGridEffect } from './effects/StyleEffects'
 import type { DeviceLayout } from './layout'
 import { localTimeOf, sampleNow } from './shotContext'
 
@@ -46,6 +49,35 @@ function Fisheye({ amount }: { amount: number }) {
   return <primitive object={effect} />
 }
 
+function PixelGrid({ amount }: { amount: number }) {
+  const effect = useMemo(() => new PixelGridEffect(), [])
+  useEffect(() => () => effect.dispose(), [effect])
+  effect.amount = amount
+  return <primitive object={effect} />
+}
+
+function GlassFrame({ fx, kind }: { fx: EffectsState; kind: 'border' | 'liquid' }) {
+  const effect = useMemo(() => new GlassFrameEffect(), [])
+  useEffect(() => () => effect.dispose(), [effect])
+  effect.setParams(kind === 'border' ? glassBorderParams(fx.glassBorder) : liquidGlassParams(fx.liquidGlass, fx.liquidGlassShine))
+  return <primitive object={effect} />
+}
+
+function LightShadow({ fx }: { fx: EffectsState }) {
+  const effect = useMemo(() => new LightShadowEffect(), [])
+  useEffect(() => () => effect.dispose(), [effect])
+  useFrame(() => {
+    effect.setParams({
+      opacity: fx.lightShadow,
+      pattern: fx.lightShadowPattern,
+      angle: THREE.MathUtils.degToRad(fx.lightShadowAngle),
+      softness: fx.lightShadowSoftness,
+      time: useEditor.getState().time,
+    })
+  })
+  return <primitive object={effect} />
+}
+
 function Grade({ clip }: { clip: ShotClip }) {
   const effect = useMemo(() => new GradeEffect(), [])
   useEffect(() => () => effect.dispose(), [effect])
@@ -79,7 +111,7 @@ function AnimatedBloom({ clip }: { clip: ShotClip }) {
   useFrame(() => {
     if (ref.current) ref.current.intensity = sampleNow(clip, 'effects.bloom') * 1.2
   })
-  return <Bloom ref={ref} intensity={clip.scene.effects.bloom * 1.2} luminanceThreshold={clip.scene.effects.bloomThreshold} luminanceSmoothing={0.08} mipmapBlur radius={0.6} />
+  return <Bloom ref={ref} intensity={clip.scene.effects.bloom * 1.2} luminanceThreshold={clip.scene.effects.bloomThreshold} luminanceSmoothing={0.08} mipmapBlur radius={clip.scene.effects.bloomRadius} />
 }
 
 function AnimatedVignette({ clip }: { clip: ShotClip }) {
@@ -108,16 +140,21 @@ export function Effects({ clip, layout }: { clip: Clip; layout: DeviceLayout | n
     !!fx &&
     (fx.exposure !== 0 || fx.brightness !== 0 || fx.contrast !== 0 || fx.saturation !== 0 || fx.hue !== 0 || fx.shadows !== 0 || fx.midtones !== 0 || fx.highlights !== 0 || hasKeys(shot, 'effects.exposure') || hasKeys(shot, 'effects.saturation'))
 
-  const fisheyeOn = !!shot && !!fx && fx.fisheye > 0
-  const bloomOn = !!shot && !!fx && (fx.bloom > 0 || hasKeys(shot, 'effects.bloom'))
-  const chromaOn = !!shot && !!fx && fx.chromatic > 0
-  const sharpenOn = !!shot && !!fx && fx.sharpen > 0
-  const grainOn = !!shot && !!fx && fx.grain > 0
-  const vignetteOn = !!shot && !!fx && (fx.vignette > 0 || hasKeys(shot, 'effects.vignette'))
+  const shown = (id: EffectId) => !!shot && !!fx && !fx.hidden?.includes(id)
+  const fisheyeOn = shown('fisheye') && fx!.fisheye > 0
+  const bloomOn = shown('bloom') && (fx!.bloom > 0 || hasKeys(shot!, 'effects.bloom'))
+  const chromaOn = shown('chromatic') && fx!.chromatic > 0
+  const sharpenOn = shown('sharpen') && fx!.sharpen > 0
+  const grainOn = shown('grain') && fx!.grain > 0
+  const vignetteOn = shown('vignette') && (fx!.vignette > 0 || hasKeys(shot!, 'effects.vignette'))
+  const pixelOn = shown('pixelGrid') && fx!.pixelGrid > 0
+  const borderOn = shown('glassBorder') && fx!.glassBorder > 0
+  const liquidOn = shown('liquidGlass') && fx!.liquidGlass > 0 && fx!.liquidGlassTarget === 'frame'
+  const shadowOn = shown('lightShadow') && fx!.lightShadow > 0
   const lensMode = shot && depth?.mode === 'lens' ? (depth.autoFocus && screenTarget ? 'auto' : 'manual') : 'off'
   // The composer does not reliably rebuild its pipeline when effects are added or removed, which can
   // leave a stale frame on screen. Remounting it whenever the effect set changes avoids that.
-  const signature = [fisheyeOn, focusBlurMode, lensMode, bloomOn, chromaOn, grade, sharpenOn, grainOn, vignetteOn].map(String).join('|')
+  const signature = [fisheyeOn, focusBlurMode, lensMode, bloomOn, chromaOn, grade, sharpenOn, grainOn, vignetteOn, pixelOn, borderOn, liquidOn, shadowOn].map(String).join('|')
 
   return (
     <EffectComposer
@@ -128,7 +165,7 @@ export function Effects({ clip, layout }: { clip: Clip; layout: DeviceLayout | n
         if (import.meta.env.DEV) (window as unknown as { __beveledComposer?: unknown }).__beveledComposer = composer
       }}
     >
-      {shot && fx && fx.fisheye > 0 ? <Fisheye amount={fx.fisheye} /> : <></>}
+      {fisheyeOn ? <Fisheye amount={fx!.fisheye} /> : <></>}
       {shot && focusBlurMode ? <FocusBlur clip={shot} mode={focusBlurMode} /> : <></>}
       {shot && depth?.mode === 'lens' ? (
         depth.autoFocus && screenTarget ? (
@@ -139,12 +176,16 @@ export function Effects({ clip, layout }: { clip: Clip; layout: DeviceLayout | n
       ) : (
         <></>
       )}
-      {shot && fx && (fx.bloom > 0 || hasKeys(shot, 'effects.bloom')) ? <AnimatedBloom clip={shot} /> : <></>}
-      {shot && fx && fx.chromatic > 0 ? <ChromaticAberration offset={chromaOffset} radialModulation modulationOffset={0.3} /> : <></>}
+      {shadowOn ? <LightShadow fx={fx!} /> : <></>}
+      {bloomOn ? <AnimatedBloom clip={shot!} /> : <></>}
+      {chromaOn ? <ChromaticAberration offset={chromaOffset} radialModulation modulationOffset={0.3} /> : <></>}
       {grade && shot ? <Grade clip={shot} /> : <></>}
-      {shot && fx && fx.sharpen > 0 ? <Sharpen amount={fx.sharpen} /> : <></>}
-      {shot && fx && fx.grain > 0 ? <Noise premultiply blendFunction={BlendFunction.ADD} opacity={fx.grain} /> : <></>}
-      {shot && fx && (fx.vignette > 0 || hasKeys(shot, 'effects.vignette')) ? <AnimatedVignette clip={shot} /> : <></>}
+      {sharpenOn ? <Sharpen amount={fx!.sharpen} /> : <></>}
+      {pixelOn ? <PixelGrid amount={fx!.pixelGrid} /> : <></>}
+      {vignetteOn ? <AnimatedVignette clip={shot!} /> : <></>}
+      {liquidOn ? <GlassFrame fx={fx!} kind="liquid" /> : <></>}
+      {borderOn ? <GlassFrame fx={fx!} kind="border" /> : <></>}
+      {grainOn ? <Noise premultiply blendFunction={BlendFunction.ADD} opacity={fx!.grain} /> : <></>}
       <Fade clip={clip} />
     </EffectComposer>
   )

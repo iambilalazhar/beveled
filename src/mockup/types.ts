@@ -29,7 +29,9 @@ export type Orientation = 'portrait' | 'landscape'
 export type BrowserStyle = 'safari' | 'chrome' | 'arc'
 export type ScreenFit = 'cover' | 'contain' | 'stretch'
 export type BlurMode = 'off' | 'lens' | 'tilt-shift' | 'radial' | 'directional'
-export type BackgroundKind = 'solid' | 'linear' | 'radial' | 'image' | 'transparent'
+export type BackgroundKind = 'solid' | 'linear' | 'radial' | 'image' | 'shader' | 'transparent'
+/** Procedural, animated backgrounds rendered in a shader (resolution independent). */
+export type ShaderBgId = 'aurora' | 'silk' | 'mesh' | 'waves' | 'prism' | 'chrome' | 'dunes' | 'swirl' | 'bokeh' | 'grain'
 export type MotionKind = 'float' | 'orbit' | 'sway' | 'spin'
 export type AspectId = 'auto' | '1:1' | '16:9' | '4:5' | '9:16' | '3:2' | '4:3' | '21:9' | 'custom'
 export type ExportFormat = 'png' | 'jpeg' | 'webp'
@@ -67,6 +69,8 @@ export type DeviceState = {
   screenBg: string
   /** Inset of the media inside the screen, 0..0.45 of the short side. */
   screenPadding: number
+  /** Scroll position of media taller than the screen: 0 = top, 1 = bottom (keyframable). */
+  scroll: number
   browserStyle: BrowserStyle
   browserDark: boolean
   browserUrl: string
@@ -95,6 +99,10 @@ export type BackgroundState = {
   /** Image background (object URL or data URL). */
   image: string | null
   imageBlur: number
+  /** Pattern used when kind is 'shader'. */
+  shader: ShaderBgId
+  /** Animation speed of shader backgrounds (0 = still). */
+  speed: number
 }
 
 export type LightingState = {
@@ -149,6 +157,66 @@ export type EffectsState = {
   midtones: number
   highlights: number
   fisheye: number
+  bloomRadius: number
+  /** Frosted glass border around the frame, % of the short side (0 = off). */
+  glassBorder: number
+  /** LCD pixel grid, 0..1 (0 = off). */
+  pixelGrid: number
+  /** Gradient fade across the device screen. */
+  screenFade: number
+  screenFadeAngle: number
+  screenFadeSoftness: number
+  /** Liquid glass refraction (0 = off) applied to the frame edges or the device body. */
+  liquidGlass: number
+  liquidGlassShine: number
+  liquidGlassTarget: 'frame' | 'mockup'
+  /** Light-through-a-window shadow overlay (0 = off). */
+  lightShadow: number
+  lightShadowPattern: LightShadowPattern
+  lightShadowAngle: number
+  lightShadowSoftness: number
+  /** Effects switched off with the eye toggle but kept in the stack. */
+  hidden: EffectId[]
+}
+
+export type LightShadowPattern = 'blinds' | 'window' | 'leaves' | 'palm'
+
+export type EffectId =
+  | 'glassBorder'
+  | 'sharpen'
+  | 'vignette'
+  | 'grain'
+  | 'fisheye'
+  | 'pixelGrid'
+  | 'chromatic'
+  | 'bloom'
+  | 'screenFade'
+  | 'liquidGlass'
+  | 'lightShadow'
+
+export type EnvironmentId = 'none' | 'concrete-desk' | 'wood-desk' | 'dark-room' | 'dark-grid' | 'concrete-dark' | 'bright-studio'
+
+/** A 3-D set around the device: floor / desk, back wall, fog. */
+export type EnvironmentState = {
+  kind: EnvironmentId
+  /** Height of the back wall relative to the device, 0 = no wall. */
+  wall: number
+  /** Distance of the wall behind the device. */
+  depth: number
+  /** Fog density blending the set into its backdrop colour. */
+  fog: number
+}
+
+export type GroupArrangement = 'row' | 'fan' | 'cascade' | 'stack' | 'tilt'
+
+/** Two or three copies of the device in one shot, each with its own screen. */
+export type GroupState = {
+  count: 1 | 2 | 3
+  arrangement: GroupArrangement
+  spacing: number
+  /** Screens of devices 2 and 3; null shows the main media. */
+  media2: MediaState | null
+  media3: MediaState | null
 }
 
 export type MotionState = {
@@ -178,6 +246,10 @@ export type ExportState = {
   videoHeight: number
   /** Video bitrate in megabits per second. */
   videoBitrate: number
+  /** Sub-frame samples per frame for video motion blur (1 = off). */
+  motionBlur: number
+  /** Keep the alpha channel in WebM video (transparent background only). */
+  videoAlpha: boolean
 }
 
 export type SceneState = {
@@ -189,6 +261,8 @@ export type SceneState = {
   depth: DepthState
   effects: EffectsState
   motion: MotionState
+  environment: EnvironmentState
+  group: GroupState
   frame: FrameState
   export: ExportState
 }

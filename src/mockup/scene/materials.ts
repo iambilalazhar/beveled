@@ -2,6 +2,8 @@ import { useEffect, useMemo } from 'react'
 import * as THREE from 'three'
 import { FINISH_BY_ID } from '../presets'
 import type { FinishId } from '../types'
+import { effectOn } from './effectState'
+import { useShotScene } from './shotContext'
 
 /* ------------------------------------------------------------------ */
 /* Materials                                                           */
@@ -27,10 +29,15 @@ function mix(hex: string, towards: string, k: number) {
 /** Physically based materials for a finish. Shared by every part of a device; disposed on change. */
 export function useDeviceMaterials(finishId: FinishId, envIntensity: number): DeviceMaterials {
   const finish = FINISH_BY_ID[finishId] ?? FINISH_BY_ID['space-black']
+  const fx = useShotScene('effects')
+  // Liquid glass on the mockup turns the body into clear, refractive glass tinted by the finish.
+  const glassOn = effectOn(fx, 'liquidGlass', fx.liquidGlass) && fx.liquidGlassTarget === 'mockup'
+  const glassStrength = glassOn ? Math.round(fx.liquidGlass * 100) / 100 : -1
+  const glassShine = glassOn ? Math.round(fx.liquidGlassShine * 100) / 100 : 0
   const mats = useMemo<DeviceMaterials>(() => {
     const base = new THREE.Color(finish.color)
     const light = base.getHSL({ h: 0, s: 0, l: 0 }).l > 0.6
-    return {
+    const out: DeviceMaterials = {
       frame: new THREE.MeshPhysicalMaterial({ color: base, metalness: light ? 0.7 : 0.88, roughness: light ? 0.3 : Math.max(0.2, finish.roughness - 0.08), clearcoat: 0.35, clearcoatRoughness: 0.25 }),
       back: new THREE.MeshPhysicalMaterial({ color: mix(finish.color, light ? '#ffffff' : '#9a9a9a', 0.12), metalness: 0.35, roughness: 0.62, clearcoat: 0.6, clearcoatRoughness: 0.55 }),
       glass: new THREE.MeshPhysicalMaterial({ color: '#030304', metalness: 0, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.03, reflectivity: 0.6 }),
@@ -42,7 +49,30 @@ export function useDeviceMaterials(finishId: FinishId, envIntensity: number): De
       trackpad: new THREE.MeshPhysicalMaterial({ color: mix(finish.color, '#808080', 0.08), metalness: 0.55, roughness: 0.32, clearcoat: 0.8, clearcoatRoughness: 0.2 }),
       accent: new THREE.MeshPhysicalMaterial({ color: '#ff6a13', metalness: 0.4, roughness: 0.35, clearcoat: 0.6 }),
     }
-  }, [finish])
+    if (glassStrength >= 0) {
+      const glass = { strength: glassStrength, shine: glassShine }
+      const make = () =>
+        new THREE.MeshPhysicalMaterial({
+          color: mix(finish.color, '#ffffff', 0.55),
+          metalness: 0,
+          roughness: 0.04 + (1 - glass.strength) * 0.12,
+          transmission: 0.55 + glass.strength * 0.45,
+          thickness: 0.35,
+          ior: 1.5,
+          clearcoat: 1,
+          clearcoatRoughness: 0.02,
+          iridescence: glass.shine,
+          iridescenceIOR: 1.6,
+          specularIntensity: 1,
+          attenuationColor: new THREE.Color(finish.color),
+          attenuationDistance: 1.2,
+        })
+      out.frame = make()
+      out.back = make()
+      out.trackpad = make()
+    }
+    return out
+  }, [finish, glassStrength, glassShine])
   useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats])
   for (const m of Object.values(mats)) (m as THREE.MeshStandardMaterial).envMapIntensity = envIntensity
   return mats

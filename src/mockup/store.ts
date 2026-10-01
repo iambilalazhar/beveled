@@ -4,12 +4,14 @@ import { cloneClip, DEFAULT_AUDIO, defaultShotScene, FADE, CUT, makeLogo, makeSh
 import { DEFAULT_EASING } from './timeline/easing'
 import { clipIndexAt, clipStart, keyframeAt, MAX_CLIP, MIN_CLIP, resolveShotScene, sampleShot, totalDuration } from './timeline/evaluate'
 import { ANIM_KEYS, kf, MOTION_PRESET_BY_ID } from './timeline/motionPresets'
+import { buildAutoMotion, type AutoMotionOptions } from './timeline/autoMotion'
 import type {
   AnimKey,
   AudioState,
   Clip,
   ClipKind,
   Easing,
+  FocusArea,
   KeyframeRef,
   LogoState,
   ShotClip,
@@ -69,6 +71,8 @@ type EditorStore = {
 
   panel: PanelId | null
   templatesOpen: boolean
+  autoMotionOpen: boolean
+  shortcutsOpen: boolean
   exportRequest: ExportRequest | null
   exporting: boolean
   videoRequest: VideoRequest | null
@@ -112,6 +116,12 @@ type EditorStore = {
   clearTrack: (clipId: string, key: AnimKey) => void
   selectKeyframe: (ref: KeyframeRef | null) => void
   applyMotionPreset: (presetId: string, clipId?: string) => void
+  /** Generates a camera path through focus areas on the edited shot. */
+  applyAutoMotion: (areas: FocusArea[], opts: AutoMotionOptions) => void
+  setAutoMotionOpen: (open: boolean) => void
+  setShortcutsOpen: (open: boolean) => void
+  /** Replaces the whole project (opened from a file). */
+  loadProject: (project: Project) => void
   clearMotion: (clipId?: string) => void
 
   /* playback / timeline UI */
@@ -158,25 +168,29 @@ function defaultProject(): Project {
   }
 }
 
-/** Fills fields added after a project was saved. */
-function hydrateProject(saved: Partial<Project>): Project {
+/** Fills fields added after a project was saved. Media URLs are dropped unless `keepMedia` (project files embed them). */
+export function hydrateProject(saved: Partial<Project>, keepMedia = false): Project {
   const base = defaultProject()
   const shotDefaults = defaultShotScene()
   const clips = (saved.clips ?? base.clips).map((c) => {
     if (c.kind === 'shot') {
       const scene = mergeShotScene(shotDefaults, c.scene as ScenePatch)
+      if (keepMedia) return { ...c, scene: { ...scene, media: { ...DEFAULT_SCENE.media, ...c.scene.media } }, tracks: c.tracks ?? {} } as ShotClip
       scene.media = { ...DEFAULT_SCENE.media }
+      scene.group = { ...scene.group, media2: null, media3: null }
       if (scene.background.image?.startsWith('blob:')) scene.background = { ...scene.background, image: null, kind: 'radial' }
       return { ...c, scene, tracks: c.tracks ?? {} } as ShotClip
     }
-    if (c.kind === 'logo' && c.logo.url?.startsWith('blob:')) return { ...c, logo: { ...c.logo, url: null } }
+    if (!keepMedia && c.kind === 'logo' && c.logo.url?.startsWith('blob:')) return { ...c, logo: { ...c.logo, url: null } }
     return c
   })
+  // Every project needs at least one shot: the inspector edits a shot's scene.
+  if (!clips.some((c) => c.kind === 'shot')) clips.unshift(base.clips[0])
   return {
-    clips: clips.length ? clips : base.clips,
+    clips,
     frame: { ...base.frame, ...saved.frame },
     export: { ...base.export, ...saved.export },
-    audio: { ...DEFAULT_AUDIO },
+    audio: keepMedia ? { ...DEFAULT_AUDIO, ...saved.audio } : { ...DEFAULT_AUDIO },
   }
 }
 
@@ -208,6 +222,7 @@ function persist(project: Project) {
               scene: {
                 ...c.scene,
                 media: { ...DEFAULT_SCENE.media },
+                group: { ...c.scene.group, media2: null, media3: null },
                 background: { ...c.scene.background, image: bgImage && bgImage.length < 400_000 && !bgImage.startsWith('blob:') ? bgImage : null },
               },
             }
@@ -314,6 +329,8 @@ export const useEditor = create<EditorStore>((set, get) => {
 
     panel: 'device',
     templatesOpen: false,
+    autoMotionOpen: false,
+    shortcutsOpen: false,
     exportRequest: null,
     exporting: false,
     videoRequest: null,
@@ -498,6 +515,10 @@ export const useEditor = create<EditorStore>((set, get) => {
       }
       const idx = s.project.clips.findIndex((c) => c.id === id)
       const clips = s.project.clips.filter((c) => c.id !== id)
+      if (!clips.some((c) => c.kind === 'shot')) {
+        get().setStatus('Keep at least one shot on the timeline')
+        return
+      }
       const next = clips[Math.min(idx, clips.length - 1)]
       commit({ ...s.project, clips }, { selectedClipId: next.id, time: clipStart(clips, next.id), selectedKeyframe: null, panel: next.kind === 'shot' ? 'device' : 'clip' }, { force: true })
     },
@@ -640,6 +661,31 @@ export const useEditor = create<EditorStore>((set, get) => {
       const project = replaceClip(s.project, shot.id, () => ({ ...shot, duration: preset.duration, tracks }))
       commit(project, { selectedClipId: shot.id, time: clipStart(project.clips, shot.id), expanded: [...new Set([...s.expanded, shot.id])] }, { force: true })
       get().setStatus(`Applied “${preset.label}” — press play`)
+    },
+
+    applyAutoMotion: (areas, opts) => {
+      const s = get()
+      const shot = editShot(s.project, s.selectedClipId)
+      if (!areas.length) {
+        commit(replaceClip(s.project, shot.id, () => ({ ...shot, focusAreas: [] })), {}, { force: true })
+        return
+      }
+      const aspect = s.canvasSize.width / Math.max(1, s.canvasSize.height)
+      const { tracks, duration } = buildAutoMotion(shot.scene, areas, opts, aspect)
+      const kept = Object.fromEntries(Object.entries(shot.tracks).filter(([key]) => !key.startsWith('camera.')))
+      const project = replaceClip(s.project, shot.id, () => ({ ...shot, duration, focusAreas: areas, tracks: { ...kept, ...tracks } }))
+      commit(
+        project,
+        { autoMotionOpen: false, selectedClipId: shot.id, time: clipStart(project.clips, shot.id), expanded: [...new Set([...s.expanded, shot.id])] },
+        { force: true }
+      )
+      get().setStatus(`Auto-motion: ${areas.length} focus area${areas.length > 1 ? 's' : ''} · ${duration.toFixed(1)}s — press play`)
+    },
+    setAutoMotionOpen: (autoMotionOpen) => set({ autoMotionOpen, playing: false }),
+    setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+    loadProject: (project) => {
+      const first = project.clips.find((c) => c.kind === 'shot') ?? project.clips[0]
+      commit(project, { selectedClipId: first.id, time: 0, playing: false, selectedKeyframe: null, expanded: [] }, { force: true })
     },
 
     clearMotion: (clipId) => {

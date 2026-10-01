@@ -40,6 +40,7 @@ export type AnimKey =
   | 'device.rotateY'
   | 'device.lidAngle'
   | 'device.scale'
+  | 'device.scroll'
   | 'lighting.rotation'
   | 'lighting.elevation'
   | 'lighting.intensity'
@@ -127,7 +128,10 @@ export type LogoState = {
   exit: LogoAnim
 }
 
-export type ShotClip = ClipBase & { kind: 'shot'; scene: ShotScene; tracks: Tracks }
+/** A focus area for auto-motion, in normalised media coordinates (y down). */
+export type FocusArea = { id: string; x: number; y: number; w: number; h: number }
+
+export type ShotClip = ClipBase & { kind: 'shot'; scene: ShotScene; tracks: Tracks; focusAreas?: FocusArea[] }
 export type TextClip = ClipBase & { kind: 'text'; text: TextState }
 export type LogoClip = ClipBase & { kind: 'logo'; logo: LogoState }
 export type Clip = ShotClip | TextClip | LogoClip

@@ -14,7 +14,12 @@ import { Floor } from './Floor'
 import { computeDeviceLayout, type DeviceLayout } from './layout'
 import { Lights } from './Lights'
 import { MotionGroup } from './MotionGroup'
+import { DeviceSlotContext } from './deviceSlot'
+import { groupLayout, groupSlots } from './group'
+import { SetPiece } from './SetPiece'
 import { ShotContext } from './shotContext'
+import { ENVIRONMENT_BY_ID } from '../presets'
+import type { BackgroundState } from '../types'
 
 /** Advances the playhead while playing. Mounted first so every other frame callback sees the new time. */
 function PlaybackDriver() {
@@ -43,25 +48,43 @@ function useLayout(clip: ShotClip) {
   return useMemo(() => computeDeviceLayout(device, mediaAspect), [device, mediaAspect])
 }
 
-function ShotView({ clip, layout }: { clip: ShotClip; layout: DeviceLayout }) {
+function ShotView({ clip, layout, frameLayout }: { clip: ShotClip; layout: DeviceLayout; frameLayout: DeviceLayout }) {
+  const { group, environment, media } = clip.scene
+  const slots = useMemo(() => groupSlots(layout, group), [layout, group])
+  const env = ENVIRONMENT_BY_ID[environment.kind]
+  // A set replaces the background with its backdrop colour so the fog has something to fade into.
+  const bg = useMemo<BackgroundState>(
+    () => (env && clip.scene.background.kind !== 'transparent' ? { ...clip.scene.background, kind: 'solid', colors: [env.backdrop] } : clip.scene.background),
+    [env, clip.scene.background]
+  )
+  const slotMedia = [media, group.media2, group.media3]
   return (
     <ShotContext.Provider value={clip}>
-      <Background bg={clip.scene.background} />
+      <Background bg={bg} />
       <Lights />
-      <CameraRig layout={layout} />
+      <CameraRig layout={frameLayout} />
       <MotionGroup layout={layout}>
-        <Device device={clip.scene.device} layout={layout} lighting={clip.scene.lighting} />
+        {slots.map((slot, i) => (
+          <group key={i} position={slot.position} rotation={slot.rotation}>
+            <DeviceSlotContext.Provider value={{ index: slot.mediaIndex, media: slotMedia[slot.mediaIndex] ?? null }}>
+              <Device device={clip.scene.device} layout={layout} lighting={clip.scene.lighting} />
+            </DeviceSlotContext.Provider>
+          </group>
+        ))}
       </MotionGroup>
-      <Floor layout={layout} />
+      {env && <SetPiece env={environment} layout={frameLayout} />}
+      <Floor layout={frameLayout} />
     </ShotContext.Provider>
   )
 }
 
 function ShotLayer({ clip }: { clip: ShotClip }) {
   const layout = useLayout(clip)
+  const group = clip.scene.group
+  const frameLayout = useMemo(() => groupLayout(layout, groupSlots(layout, group)), [layout, group])
   return (
     <>
-      <ShotView clip={clip} layout={layout} />
+      <ShotView clip={clip} layout={layout} frameLayout={frameLayout} />
       <Effects clip={clip} layout={layout} />
     </>
   )
