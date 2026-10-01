@@ -31,7 +31,13 @@ Audited `https://shots.so/` on 2026-09-30 with a real browser screenshot loaded.
 ## Templates
 - Slide-in panel with **All / Image / Animated** filters and categories (Product promotion, Abstract Shapes, Realistic Desktop, …). Every card is a real rendered preview, animated ones marked with a camera icon.
 
-## What Beveled takes from this
+## Re-check (2026-10-02)
+Current control lists: Screenshot styles Default · Glass Light · Glass Dark · Liquid Glass · Inset Light · Inset Dark · Outline · Border; Border Sharp · Curved · Round + Radius; Shadow None · Spread · Hug · Adaptive + Opacity + Adjust Light; Visibility (Hide Mockup); Effects & Watermark (Portrait, Watermark, Bg Effects, VFX); Scene None · Shadow · Shapes; right panel Zoom / Tilt with layout presets and Animate.
+
+## Beveled's 2D studio
+`/editor?mode=2d` (the 2D | 3D switch) implements this editor: Mockup and Frame tabs, the device families above as flat front-on frames, all screenshot styles, browser styles, shadows, Magic preset, 1–3 devices, frame sizes, background libraries plus Magic, scene shadows and shapes, portrait blur and VFX, watermark, Zoom / Tilt with layout presets, and *Add animation* layout steps with per-step duration and easing, exported to PNG / JPG / WebP or MP4 / WebM. Not implemented: Unsplash search, the paid 3-D "Bg Effects" and "Portrait" auto-masking of people.
+
+## What Beveled takes from this (in the 3D editor)
 - Platform frame-size presets (Instagram, X/Twitter, YouTube, Pinterest, Dribbble, App Store) next to plain ratios.
 - Browser chrome styles (Safari / Chrome / Arc, light and dark) and an address bar URL.
 - Shadow styles and opacity.

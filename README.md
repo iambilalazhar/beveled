@@ -2,9 +2,9 @@
 
 <img src="public/beveled_icon.png" alt="Beveled icon" width="80" height="80" />
 
-### beveled — 3D device mockups from your screenshots
+### beveled — 2D & 3D mockups from your screenshots
 
-Drop a screenshot or screen recording onto a real-looking iPhone, iPad, MacBook, display, browser window or watch, animate it on a timeline, and export images or video. Everything renders in your browser.
+Frame a screenshot shots.so-style on a beautiful background, or drop it onto a real-looking 3D iPhone, iPad, MacBook, display or watch. Animate it, and export images or video. Everything renders in your browser.
 
 </div>
 
@@ -12,13 +12,28 @@ Drop a screenshot or screen recording onto a real-looking iPhone, iPad, MacBook,
 
 Beveled is an open-source web app and Chrome extension for turning screenshots into polished 3D product shots and short launch videos. It is modelled on tools like UltraMock and shots.so (see `docs/ultramock-audit.md` and `docs/shots-audit.md`), with Beveled's tangerine branding and no paywall.
 
-- **Web app** — `/editor` is the 3D mockup editor; upload, drag and drop, or paste a screenshot or video.
+- **Web app** — `/editor` is the mockup studio with a **2D | 3D** switch in the top bar (`/editor?mode=2d` or `?mode=3d` deep-links one). Upload, drag and drop, or paste a screenshot or video; it carries across when you switch.
 - **Chrome extension** — capture the visible tab, the full page or an emulated device viewport, and the capture opens straight in the 3D editor.
 - **Private** — no servers. Images, video and exports never leave your machine.
 
 The original 2D screenshot beautifier is still available at `/classic`.
 
 ## Features
+
+### 2D studio (shots.so-style)
+
+- **Mockups**: Screenshot (styles: Default, Glass Light/Dark, Liquid Glass, Inset Light/Dark, Outline, Border; sharp / curved / round corners), Browser (Safari, Chrome, Arc — light or dark, editable address bar), and flat front-on iPhone, Android, iPad, MacBook, Studio Display / Pro Display XDR and Apple Watch frames drawn from the same real-world specs as the 3D models, in every finish. Portrait or landscape, fill / fit / stretch and scroll.
+- **1, 2 or 3 devices**, each with its own image or video. **Magic preset** cycles ready-made looks.
+- **Shadows**: None, Spread, Hug and Adaptive (a glow coloured by your screenshot), with opacity, light angle and distance.
+- **Frame**: any W×H, ratio chips and Instagram / X / YouTube / LinkedIn / Pinterest / Dribbble / Product Hunt / App Store sizes.
+- **Backgrounds**: Magic (generated from your screenshot), Solid, Gradient, Glass, Cosmic, Mystic, Desktop, Abstract, Earth, Radiant and Texture libraries — many of them animated — plus colour, gradient, image and transparent.
+- **Scene**: light shadows (leaves, palm, blinds, window) or soft decorative shapes; portrait blur, grain, vignette, glow, chromatic aberration and a watermark.
+- **Layout**: zoom, position and 3-D tilt (drag the canvas to move, scroll to zoom, ⇧-drag to tilt) and ten layout presets (tilts, lay back, isometric, float, corner zooms, hero crop).
+- **Animation**: *Add animation* appends a layout step on the timeline; each step eases from the previous layout with its own duration and bezier easing. Optional parallax idle motion.
+- **Export**: PNG / JPG / WebP at 1×–4× of the frame size, and frame-accurate MP4 / WebM of the animation (videos on screen are seeked per frame).
+- 11 templates with rendered previews, including animated zoom tours and tilt reveals.
+
+### 3D studio (UltraMock-style)
 
 **Devices** — procedural models built from real-world dimensions (1 scene unit = 100 mm), with physically based finishes, coated camera lenses, buttons, ports, speaker grilles and more:
 iPhone 17 Pro, 17 Pro Max, 17 and Air · Pixel 10 Pro and Galaxy S25 Ultra · iPad Pro 13", iPad Pro 11" and iPad Air · MacBook Pro 14", 16" and MacBook Air 13" (adjustable lid, notch, instanced keyboard) · Studio Display and Pro Display XDR · Watch Ultra 3 and Watch Series 11 · a floating browser window (Safari / Chrome / Arc, light or dark) · a bare rounded screen · **your own .glb model** (meshes named "screen" or "display" receive the media).
@@ -68,7 +83,9 @@ iPhone 17 Pro, 17 Pro Max, 17 and Air · Pixel 10 Pro and Galaxy S25 Ultra · iP
 
 ```
 src/
-  mockup/                 # 3D mockup editor (routes /editor and editor.html)
+  studio/                 # /editor shell: 2D | 3D switch, carries media across
+  shots/                  # 2D studio: flat cards (canvas-drawn frames), store, layout timeline, UI
+  mockup/                 # 3D mockup editor
     types.ts              # Scene state types
     presets.ts            # Devices, finishes, lighting, backgrounds, camera presets, frames, templates
     store.ts              # zustand store: project of clips, undo/redo, keyframing, playback, export requests
@@ -85,6 +102,7 @@ src/
 docs/                     # UltraMock and shots.so audits used as the product spec
 public/templates/         # Rendered template previews
 public/backgrounds/       # Thumbnails of the animated background library
+public/shots-templates/   # Rendered 2D template previews
 ```
 
 ## Getting started
@@ -112,6 +130,8 @@ pnpm lint      # Run ESLint
 3. Capture from the popup. The capture is stored in `chrome.storage.local` as `latestCapture` and `editor.html` opens it in the 3D editor.
 
 ## How it works
+
+- The 2D studio draws each mockup front-on into a canvas (frame only, screen left transparent) from real device specs; the media is a separate rounded, fitted plane underneath, so screenshots and videos stay at full resolution. Cards are laid out in a WebGL scene with a narrow-angle camera, which gives CSS-like perspective tilt and makes image and video export use the same renderer as the preview.
 
 - Each **shot** stores a full scene (device, camera, background, lighting, depth, effects, idle motion) plus keyframe tracks. The renderer always shows the clip under the playhead and samples keyframes every frame, so preview and export use the same code path.
 - Devices are built from millimetre specs in `src/mockup/scene/models.ts`. Screens use a shader that fits the media (cover / contain / stretch, padding, rotation).
