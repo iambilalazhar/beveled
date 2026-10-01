@@ -5,7 +5,7 @@ import type { Easing } from '@/mockup/timeline/types'
 import type { ExportFormat, MediaState } from '@/mockup/types'
 import { BASE_LAYOUT, DEFAULT_SHOTS } from './presets'
 import { layoutAt, stepEnd, totalDuration } from './timeline'
-import type { FrameState2D, Layout2D, MockupState, ShotsExport, ShotsProject, ShotsTemplate } from './types'
+import type { FrameState2D, Layout2D, MockupState, ShotsExport, ShotsProject, ShotsTemplate, TextState2D } from './types'
 
 const STORAGE_KEY = 'beveled.shots.project.v1'
 const MAX_HISTORY = 80
@@ -22,7 +22,7 @@ type ShotsStore = {
   time: number
   playing: boolean
   loop: boolean
-  tab: 'mockup' | 'frame'
+  tab: 'mockup' | 'text' | 'frame'
   rightTab: 'zoom' | 'tilt'
   templatesOpen: boolean
   exportRequest: ShotsExportRequest | null
@@ -35,6 +35,7 @@ type ShotsStore = {
 
   setMockup: (patch: Partial<MockupState>) => void
   setFrame: (patch: Partial<FrameState2D>) => void
+  setText: (patch: Partial<TextState2D>) => void
   setExport: (patch: Partial<ShotsExport>) => void
   setMedia: (index: number, media: MediaState | null) => void
   /** Edits the layout being edited (the base or the selected step). */
@@ -54,7 +55,7 @@ type ShotsStore = {
   setPlaying: (playing: boolean) => void
   togglePlay: () => void
   setLoop: (loop: boolean) => void
-  setTab: (tab: 'mockup' | 'frame') => void
+  setTab: (tab: 'mockup' | 'text' | 'frame') => void
   setRightTab: (tab: 'zoom' | 'tilt') => void
   setTemplatesOpen: (open: boolean) => void
   requestExport: (req?: Partial<Omit<ShotsExportRequest, 'id'>>) => void
@@ -86,6 +87,7 @@ function hydrate(saved: Partial<ShotsProject>, keepMedia = false): ShotsProject 
   return {
     mockup: { ...base.mockup, ...saved.mockup, media },
     frame: { ...frame, background: { ...base.frame.background, ...frame.background } },
+    text: { ...base.text, ...saved.text },
     base: { ...BASE_LAYOUT, ...saved.base },
     steps: (saved.steps ?? []).map((s) => ({ ...s, layout: { ...BASE_LAYOUT, ...s.layout }, easing: s.easing ?? { ...DEFAULT_EASING } })),
     export: { ...base.export, ...saved.export },
@@ -178,6 +180,10 @@ export const useShots = create<ShotsStore>((set, get) => {
       const p = get().project
       commit({ ...p, frame: { ...p.frame, ...patch } }, {}, { tag: `f:${Object.keys(patch).join()}` })
     },
+    setText: (patch) => {
+      const p = get().project
+      commit({ ...p, text: { ...p.text, ...patch } }, {}, { tag: `t:${Object.keys(patch).join()}` })
+    },
     setExport: (patch) => {
       const p = get().project
       commit({ ...p, export: { ...p.export, ...patch } }, {}, { tag: 'export' })
@@ -245,7 +251,8 @@ export const useShots = create<ShotsStore>((set, get) => {
       const project: ShotsProject = {
         ...p,
         mockup: { ...fresh0.mockup, ...t.mockup, media: p.mockup.media },
-        frame: { ...fresh0.frame, ...t.frame, width: p.frame.width, height: p.frame.height, background: { ...fresh0.frame.background, ...t.frame?.background } },
+        frame: { ...fresh0.frame, ...t.frame, width: t.frame?.width ?? p.frame.width, height: t.frame?.height ?? p.frame.height, background: { ...fresh0.frame.background, ...t.frame?.background } },
+        text: { ...fresh0.text, ...t.text },
         base,
         steps,
       }

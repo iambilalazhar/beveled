@@ -1,7 +1,7 @@
 import { Bloom, ChromaticAberration, EffectComposer, Noise, Vignette } from '@react-three/postprocessing'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { BlendFunction } from 'postprocessing'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { Background } from '@/mockup/scene/Background'
 import { FocusBlurEffect } from '@/mockup/scene/effects/FocusBlurEffect'
@@ -12,6 +12,9 @@ import { useShots } from '../store'
 import { layoutAt, totalDuration } from '../timeline'
 import type { FrameState2D, MockupState } from '../types'
 import { cardSpec, renderCard, renderSilhouette, type CardSpec } from './cards'
+import { drawTextBlock, splitRegions } from './textBlock'
+import { ensureFont } from '@/mockup/timeline/cardRender'
+import type { TextState2D } from '../types'
 import { ShotsExportBridge } from './ShotsExportBridge'
 
 const FOV = 22
@@ -179,7 +182,7 @@ function DeviceCard({ item, mockup, index }: { item: CardLayout; mockup: MockupS
 }
 
 /** Places 1–3 cards side by side and fits them inside the frame. */
-function useCardLayouts(mockup: MockupState, aspect: number): CardLayout[] {
+function useCardLayouts(mockup: MockupState, aspect: number, region: { w: number; h: number }): CardLayout[] {
   const main = mockup.media[0]
   const mediaKey = mockup.media.map((m) => `${m?.url}|${m?.width}x${m?.height}`).join(';')
   return useMemo(() => {
@@ -190,8 +193,10 @@ function useCardLayouts(mockup: MockupState, aspect: number): CardLayout[] {
     const widths = cards.map((c) => c.width * (H / c.height))
     const gap = mockup.gap * H
     const totalW = widths.reduce((a, w) => a + w, 0) + gap * (cards.length - 1)
-    const boxW = 2 * aspect * 0.8
-    const boxH = 2 * 0.8
+    const full = region.w >= 1 && region.h >= 1
+    const fill = full ? 0.8 : 0.86
+    const boxW = 2 * aspect * region.w * fill
+    const boxH = 2 * region.h * fill
     const k = Math.min(boxW / totalW, boxH / H)
     let cursor = -totalW / 2
     return cards.map((card, i) => {
@@ -201,13 +206,17 @@ function useCardLayouts(mockup: MockupState, aspect: number): CardLayout[] {
       return item
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mockup.kind, mockup.model, mockup.finish, mockup.style, mockup.radius, mockup.borderWidth, mockup.borderColor, mockup.browserStyle, mockup.browserDark, mockup.browserUrl, mockup.orientation, mockup.count, mockup.gap, mediaKey, aspect])
+  }, [mockup.kind, mockup.model, mockup.finish, mockup.style, mockup.radius, mockup.borderWidth, mockup.borderColor, mockup.browserStyle, mockup.browserDark, mockup.browserUrl, mockup.orientation, mockup.count, mockup.gap, mediaKey, aspect, region.w, region.h])
 }
 
-function Mockup({ mockup }: { mockup: MockupState }) {
+function Mockup({ mockup, text }: { mockup: MockupState; text: TextState2D }) {
   const size = useThree((s) => s.size)
   const aspect = size.width / Math.max(1, size.height)
-  const items = useCardLayouts(mockup, aspect)
+  const region = splitRegions(text.placement, text.area).mockup
+  const items = useCardLayouts(mockup, aspect, region)
+  // Centre of the mockup's share of the frame, in world units.
+  const ox = (region.x + region.w / 2 - 0.5) * 2 * aspect
+  const oy = -(region.y + region.h / 2 - 0.5) * 2
   const ref = useRef<THREE.Group>(null)
   useFrame(() => {
     const g = ref.current
@@ -221,7 +230,7 @@ function Mockup({ mockup }: { mockup: MockupState }) {
       rx += Math.sin(t * 0.9) * 3
       ry += Math.sin(t * 0.7 + 1) * 4
     }
-    g.position.set(l.x * aspect, l.y, 0)
+    g.position.set(ox + l.x * aspect, oy + l.y, 0)
     g.rotation.set(-D2R(rx), D2R(ry), -D2R(l.rotateZ), 'XYZ')
     g.scale.setScalar(Math.max(0.05, l.zoom))
   })
@@ -289,6 +298,50 @@ function Shapes({ frame }: { frame: FrameState2D }) {
     <mesh position={[0, 0, -depth]} renderOrder={-500}>
       <planeGeometry args={[2 * aspect * k, 2 * k]} />
       <meshBasicMaterial map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
+    </mesh>
+  )
+}
+
+/** Headline, subtitle, eyebrow and badge drawn into a frame-sized canvas. */
+function TextLayer({ text, frame }: { text: TextState2D; frame: FrameState2D }) {
+  const size = useThree((s) => s.size)
+  const aspect = size.width / Math.max(1, size.height)
+  const [fontsTick, setFontsTick] = useState(0)
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([ensureFont(text.font, text.weight), ensureFont(text.bodyFont, 400), ensureFont(text.bodyFont, 600)]).then(() => !cancelled && setFontsTick((n) => n + 1))
+    return () => {
+      cancelled = true
+    }
+  }, [text.font, text.bodyFont, text.weight])
+  const canvas = useMemo(() => {
+    const k = Math.min(2, 4096 / Math.max(frame.width, frame.height))
+    const W = Math.round(frame.width * k)
+    const H = Math.round(frame.height * k)
+    const c = document.createElement('canvas')
+    c.width = W
+    c.height = H
+    const r = splitRegions(text.placement, text.area).text
+    drawTextBlock(c.getContext('2d')!, W, H, text, { x: r.x * W, y: r.y * H, w: r.w * W, h: r.h * H })
+    return c
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, frame.width, frame.height, fontsTick])
+  const texture = useTexture(canvas)
+  const mat = useRef<THREE.MeshBasicMaterial>(null)
+  const mesh = useRef<THREE.Mesh>(null)
+  useFrame(() => {
+    const s = useShots.getState()
+    // Fade up at the start of playback / video; always fully visible while editing and in stills.
+    const k = text.animate && (s.playing || s.recording) ? Math.min(1, Math.max(0, (s.time - 0.1) / 0.7)) : 1
+    const e = 1 - Math.pow(1 - k, 3)
+    if (mat.current) mat.current.opacity = e
+    if (mesh.current) mesh.current.position.y = (1 - e) * -0.05
+  })
+  if (!texture) return null
+  return (
+    <mesh ref={mesh} renderOrder={text.placement === 'overlay' ? 950 : -100}>
+      <planeGeometry args={[2 * aspect, 2]} />
+      <meshBasicMaterial ref={mat} map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
     </mesh>
   )
 }
@@ -391,13 +444,15 @@ function CameraSetup() {
 function Content() {
   const mockup = useShots((s) => s.project.mockup)
   const frame = useShots((s) => s.project.frame)
+  const text = useShots((s) => s.project.text)
   return (
     <>
       <Playback />
       <CameraSetup />
       <Background bg={frame.background} time={now} />
       {frame.scene === 'shapes' && <Shapes frame={frame} />}
-      <Mockup mockup={mockup} />
+      {text.placement !== 'none' && <TextLayer text={text} frame={frame} />}
+      <Mockup mockup={mockup} text={text} />
       {frame.watermark && <Watermark text={frame.watermarkText || 'Made with Beveled'} />}
       <Effects2D frame={frame} />
       <ShotsExportBridge />

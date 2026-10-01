@@ -1,6 +1,41 @@
 import { DEFAULT_EASING } from '@/mockup/timeline/easing'
 import type { BackgroundState } from '@/mockup/types'
-import type { CornerPreset, FlatKind, Layout2D, ScreenshotStyle, ShadowStyle, ShotsProject, ShotsTemplate } from './types'
+import type { CornerPreset, FlatKind, Layout2D, ScreenshotStyle, ShadowStyle, ShotsProject, ShotsTemplate, TextState2D } from './types'
+
+export const DEFAULT_TEXT: TextState2D = {
+  placement: 'none',
+  eyebrow: 'New',
+  headline: 'Your product, *beautifully* framed',
+  subtitle: 'A short line that says why it matters.',
+  badge: '',
+  font: 'Inter',
+  bodyFont: 'Inter',
+  weight: 700,
+  size: 7,
+  spacing: -2,
+  lineHeight: 1.08,
+  align: 'center',
+  color: '#0a0a0a',
+  subColor: '#52525b',
+  accent: '#e05d38',
+  badgeText: '#ffffff',
+  highlight: 'color',
+  uppercase: false,
+  area: 0.3,
+  animate: true,
+}
+
+/** Type pairings for the Text tab. */
+export const TEXT_STYLES: { id: string; label: string; patch: Partial<TextState2D> }[] = [
+  { id: 'bold', label: 'Bold sans', patch: { font: 'Inter', bodyFont: 'Inter', weight: 800, spacing: -3, lineHeight: 1.05, uppercase: false, highlight: 'color' } },
+  { id: 'editorial', label: 'Editorial', patch: { font: 'Instrument Serif', bodyFont: 'Inter', weight: 400, spacing: -1, lineHeight: 1.02, uppercase: false, highlight: 'italic' } },
+  { id: 'grotesk', label: 'Grotesk', patch: { font: 'Space Grotesk', bodyFont: 'Space Grotesk', weight: 600, spacing: -3, lineHeight: 1.05, uppercase: false, highlight: 'marker' } },
+  { id: 'display', label: 'Display caps', patch: { font: 'Bebas Neue', bodyFont: 'DM Sans', weight: 400, spacing: 1, lineHeight: 0.95, uppercase: true, highlight: 'color' } },
+  { id: 'geometric', label: 'Geometric', patch: { font: 'Sora', bodyFont: 'Manrope', weight: 700, spacing: -2, lineHeight: 1.08, uppercase: false, highlight: 'underline' } },
+  { id: 'mono', label: 'Mono tech', patch: { font: 'JetBrains Mono', bodyFont: 'JetBrains Mono', weight: 700, spacing: -4, lineHeight: 1.1, uppercase: false, highlight: 'marker' } },
+  { id: 'classic', label: 'Classic serif', patch: { font: 'Playfair Display', bodyFont: 'Lora', weight: 700, spacing: -1, lineHeight: 1.06, uppercase: false, highlight: 'italic' } },
+  { id: 'rounded', label: 'Friendly', patch: { font: 'Nunito', bodyFont: 'Nunito', weight: 800, spacing: -1, lineHeight: 1.08, uppercase: false, highlight: 'marker' } },
+]
 
 export const FLAT_FAMILIES: { kind: FlatKind; label: string; group: string; models?: string[]; hint: string }[] = [
   { kind: 'screenshot', label: 'Screenshot', group: 'Essentials', hint: 'Adapts to media' },
@@ -202,6 +237,7 @@ export const DEFAULT_SHOTS: ShotsProject = {
     chromatic: 0,
     parallax: false,
   },
+  text: DEFAULT_TEXT,
   base: BASE_LAYOUT,
   steps: [],
   export: { format: 'png', scale: 2, quality: 0.92, videoFormat: 'mp4', fps: 30, videoBitrate: 12, stillDuration: 4 },
@@ -222,6 +258,7 @@ export const FRAME_RATIOS: { label: string; w: number; h: number }[] = [
 export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   {
     id: 's-clean',
+    category: 'minimal',
     name: 'Clean',
     tag: 'Image',
     description: 'Screenshot on a soft lilac gradient',
@@ -231,6 +268,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-glass',
+    category: 'glass',
     name: 'Glass',
     tag: 'Image',
     description: 'Frosted glass window over a mesh gradient',
@@ -240,6 +278,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-safari',
+    category: 'minimal',
     name: 'Safari',
     tag: 'Image',
     description: 'Safari window on warm paper',
@@ -248,6 +287,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-arc-dark',
+    category: 'dark',
     name: 'Arc Night',
     tag: 'Image',
     description: 'Arc window, aurora behind, tilted',
@@ -257,6 +297,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-iphone-trio',
+    category: 'devices',
     name: 'iPhone Trio',
     tag: 'Image',
     description: 'Three iPhones on peach',
@@ -265,6 +306,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-sunlit',
+    category: 'minimal',
     name: 'Sunlit',
     tag: 'Image',
     description: 'iPhone with leafy light on sand',
@@ -274,6 +316,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-macbook-iso',
+    category: 'dark',
     name: 'MacBook Iso',
     tag: 'Image',
     description: 'MacBook laid back isometric on night blue',
@@ -283,6 +326,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-shapes',
+    category: 'minimal',
     name: 'Shapes',
     tag: 'Image',
     description: 'iPad among soft shapes',
@@ -292,6 +336,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-zoom-tour',
+    category: 'feature',
     name: 'Zoom Tour',
     tag: 'Animated',
     animated: true,
@@ -307,6 +352,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-tilt-reveal',
+    category: 'social',
     name: 'Tilt Reveal',
     tag: 'Animated',
     animated: true,
@@ -318,6 +364,7 @@ export const SHOTS_TEMPLATES: ShotsTemplate[] = [
   },
   {
     id: 's-iso-spin',
+    category: 'launch',
     name: 'Iso Spin',
     tag: 'Animated',
     animated: true,

@@ -85,20 +85,57 @@ export type ShotsExport = {
   stillDuration: number
 }
 
+export type TextPlacement = 'none' | 'top' | 'bottom' | 'left' | 'right' | 'overlay'
+export type HighlightStyle = 'color' | 'marker' | 'underline' | 'italic'
+
+/** Marketing copy around the mockup: eyebrow, headline (wrap words in *stars* to highlight), subtitle, badge. */
+export type TextState2D = {
+  placement: TextPlacement
+  eyebrow: string
+  headline: string
+  subtitle: string
+  badge: string
+  font: string
+  bodyFont: string
+  weight: number
+  /** Headline size, % of the frame's short side. */
+  size: number
+  /** Letter spacing of the headline, 1/100 em. */
+  spacing: number
+  lineHeight: number
+  align: 'left' | 'center' | 'right'
+  color: string
+  subColor: string
+  accent: string
+  /** Text colour inside the badge. */
+  badgeText: string
+  highlight: HighlightStyle
+  uppercase: boolean
+  /** Share of the frame reserved for the text (top / bottom: height, left / right: width). */
+  area: number
+  /** Fade the text up at the start of videos. */
+  animate: boolean
+}
+
 export type ShotsProject = {
   mockup: MockupState
   frame: FrameState2D
+  text: TextState2D
   base: Layout2D
   steps: AnimStep[]
   export: ShotsExport
 }
+
+export type TemplateCategory = 'app-store' | 'social' | 'launch' | 'feature' | 'minimal' | 'dark' | 'devices' | 'glass'
 
 export type ShotsTemplate = {
   id: string
   name: string
   tag: string
   description: string
+  category?: TemplateCategory
   animated?: boolean
+  text?: Partial<TextState2D>
   mockup?: Partial<MockupState>
   frame?: Partial<FrameState2D>
   base?: Partial<Layout2D>

@@ -7,6 +7,7 @@ import { MockupTab } from './MockupTab'
 import { Stage2D } from './Stage2D'
 import { Templates2D } from './Templates2D'
 import { Timeline2D } from './Timeline2D'
+import { TextTab } from './TextTab'
 import { TopBar2D } from './TopBar2D'
 import { useShotsMediaSources } from './useShotsMedia'
 
@@ -72,8 +73,8 @@ export function ShotsEditor({ initialMedia = null, loadInitial = true }: { initi
       <TopBar2D />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[300px] shrink-0 flex-col border-r border-white/[0.06] bg-[#111114]">
-          <div className="grid shrink-0 grid-cols-2 gap-0.5 p-2">
-            {(['mockup', 'frame'] as const).map((t) => (
+          <div className="grid shrink-0 grid-cols-3 gap-0.5 p-2">
+            {(['mockup', 'text', 'frame'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -84,7 +85,7 @@ export function ShotsEditor({ initialMedia = null, loadInitial = true }: { initi
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">{tab === 'mockup' ? <MockupTab /> : <FrameTab />}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">{tab === 'mockup' ? <MockupTab /> : tab === 'text' ? <TextTab /> : <FrameTab />}</div>
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage2D />
