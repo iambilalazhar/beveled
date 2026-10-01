@@ -48,21 +48,27 @@ export function fontStack(family: string) {
   return GENERIC[family] ?? `"${family}", Inter, system-ui, sans-serif`
 }
 
-const requested = new Set<string>()
+const stylesheets = new Map<string, Promise<void>>()
+
 /** Lazily loads a Google Font. Rendering falls back to system fonts until it arrives (or if it is blocked). */
 export function ensureFont(family: string, weight = 400): Promise<void> {
   if (GENERIC[family] || typeof document === 'undefined') return Promise.resolve()
-  if (!requested.has(family)) {
-    requested.add(family)
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    const italicless = family.replace(/ /g, '+')
-    link.href = `https://fonts.googleapis.com/css2?family=${italicless}:wght@100..900&display=swap`
-    link.onerror = () => undefined
-    document.head.appendChild(link)
+  let sheet = stylesheets.get(family)
+  if (!sheet) {
+    sheet = new Promise<void>((resolve) => {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      // The v1 CSS API returns whichever of these weights exist; css2 with a weight range fails for static fonts.
+      link.href = `https://fonts.googleapis.com/css?family=${family.replace(/ /g, '+')}:300,400,500,600,700,800,900,400i,700i&display=swap`
+      link.onload = () => resolve()
+      link.onerror = () => resolve()
+      document.head.appendChild(link)
+    })
+    stylesheets.set(family, sheet)
   }
-  return document.fonts
-    .load(`${weight} 32px "${family}"`)
+  // Wait for the @font-face rules before asking the browser to fetch the actual font file.
+  return sheet
+    .then(() => document.fonts.load(`${weight} 32px "${family}"`))
     .then(() => undefined)
     .catch(() => undefined)
 }
