@@ -1,6 +1,6 @@
 # UltraMock editor audit
 
-Audited `https://www.ultramock.io/editor` (version 2.50.0) on 2026-09-30 in a 1493×812 viewport. This document is the spec the Beveled 3D mockup editor is built against. Where Beveled deliberately diverges (tangerine branding, no paywall, no timeline), it is noted inline.
+Audited `https://www.ultramock.io/editor` (version 2.50.0) on 2026-09-30 in a 1493×812 viewport. This document is the spec the Beveled 3D mockup editor is built against. Where Beveled deliberately diverges (tangerine branding, no paywall), it is noted inline.
 
 ## 1. Layout
 
@@ -25,7 +25,7 @@ Audited `https://www.ultramock.io/editor` (version 2.50.0) on 2026-09-30 in a 14
 - **Hamburger menu:** Sign in · Undo ⌘Z · Redo ⇧⌘Z · Toggle timeline (T) · Preferences · Info · Help ▸ · Community ▸ · Changelog.
 - **Canvas:** one WebGL canvas that fills the stage, 16px rounded corners, a light grey (`#e9e9e9`) page behind it in light mode and `#0a0a0a` in dark mode. The aspect frame letterboxes inside this area. A floating toast at the bottom-centre of the canvas offers `Upload`.
 - **Right inspector:** 254px wide. Top row has an undo (reset all) icon on the left and a light/dark toggle on the right. Sections are collapsible with a chevron; the Camera and Blur sections also have a "reset" icon in their header. Every slider row is a 36px pill: label left, value right, and a tiny keyframe diamond button after animatable values.
-- **Bottom bar / timeline:** shots (scenes) laid out on a timeline with transitions, keyframe recording, playhead, loop. This is UltraMock's video authoring model. Beveled replaces the timeline with a simpler **Motion** panel (float / sway / spin / orbit loops) and a bottom toolbar (camera presets, reset view, zoom, hint text).
+- **Bottom bar / timeline:** shots (scenes) laid out on a timeline with transitions, keyframe recording, playhead, loop. This is UltraMock's video authoring model, and Beveled implements it (see §7).
 
 ## 2. Visual style
 
@@ -144,7 +144,7 @@ Tiles in a 2-column grid with a small render, name, and FREE / PRO badge.
 
 Flat · iPhone Duo · iPhone 18 Pro · iPhone 18 Pro Max · **iPhone 17 (free)** · iPhone 17 Pro · iPhone 17 Pro Max · Galaxy S26 Ultra · Pixel 10 Pro · Apple Watch Ultra 3 · iPad Pro · iPad Air · **MacBook Neo (free)** · MacBook Air 13" · MacBook Pro 14" · MacBook Pro 16" · Studio Display · XDR Display.
 
-Beveled ships one procedural device per family instead: iPhone (Dynamic Island), Android (punch-hole), iPad, MacBook (adjustable lid, notch), Studio display on a stand, floating browser window, bare screen ("Flat"), Watch. All free.
+Beveled builds named models procedurally from real dimensions (iPhone 17 Pro / Pro Max / 17 / Air, Pixel 10 Pro, Galaxy S25 Ultra, iPad Pro 13" / 11", iPad Air, MacBook Pro 14" / 16", MacBook Air 13", Studio Display, Pro Display XDR, Watch Ultra 3 / Series 11), plus a browser window, a flat screen and your own .glb. "iPhone Duo" is covered by multi-device layouts (2 or 3 devices: row, fan, cascade, stack, tilt). All free.
 
 ## 5. Viewport ratio (top bar `FILL ▾`)
 
@@ -192,7 +192,7 @@ Back to start · Play/Pause · Loop · timecode `00:03.20 / 00:09.00` · render-
 ### 7.7 Auto-motion
 "Click and drag on your image to create one or more focus areas" — draws dashed rectangles on the screen and generates a camera path that visits each area.
 
-Beveled implements the same clip model (shot / text / logo / audio), per-shot scenes, cut and fade transitions, Simple and Advanced views, keyframe lanes with a bezier easing editor, record-keyframes, slider diamonds, motion presets, and frame-accurate MP4/WebM export with audio. It keeps its looping idle motions (float / sway / spin / orbit) as a per-shot option.
+Beveled implements the same clip model (shot / text / logo / audio), per-shot scenes, cut and fade transitions, Simple and Advanced views, keyframe lanes with a bezier easing editor, record-keyframes, slider diamonds, motion presets, **auto-motion** (focus areas drawn on the image, camera path generated through them, with move / hold / zoom / tilt options) and frame-accurate MP4/WebM export with audio. It keeps its looping idle motions (float / sway / spin / orbit) as a per-shot option.
 
 ## 8. Export (top bar `EXPORT ▾`)
 
@@ -202,7 +202,12 @@ Popover with `IMAGE` / `VIDEO` tabs.
 
 **Video:** Orientation (Landscape; Square/Portrait Pro), Size (`16:9 — 1280×720 (720p)`), Quality (Low · Med · High(Pro) · Ultra(Pro)), Frame rate (30 · 60 Pro), Motion blur (Off · Low · Med · High, Pro), Transparent background (Pro), summary `1280 × 720 · 30 fps · ~7 Mbps`, `EXPORT VIDEO`, note that the tab must stay open.
 
-Beveled: PNG / JPEG / WebP at 1×–4×, quality slider for lossy formats, transparent background, and WebM recording of the motion loop.
+Beveled: PNG / JPEG / WebP at 1×–4×, quality slider for lossy formats, transparent background; MP4 / WebM of the whole timeline at 720p–4K, 24/30/60 fps, Low–Ultra quality, motion blur (Off / Low / Med / High sub-frame accumulation) and transparent WebM. Nothing is paywalled.
 
 ## 9. Keyboard
 `⌘Z` undo, `⇧⌘Z` redo, `T` toggle timeline, `Space+drag` pan, `Esc` closes popovers.
+
+## 10. Parity notes (Beveled)
+- **Scene picker** (§3.2): Beveled's Scene panel offers six procedural 3-D environments (concrete desk, oak desk, dark room, dark grid, concrete dark, bright studio) instead of UltraMock's Pro scenes, and a library of animated shader backgrounds instead of the bundled abstract images.
+- **Effects** (§3.7): the same + / eye / – stack with Glass Border, Sharpen, Vignette, Grain, Fish Eye, Pixel Grid, Chromatic Abb., Bloom (strength / threshold / radius), Screen Fade (angle / intensity / softness) and Liquid Glass (frame or mockup, strength, shine), plus a Light Shadow overlay borrowed from shots.so. Depth lives in its own panel; Ghost is not implemented (it is disabled in UltraMock too).
+- **Menu** (§1): New / Open / Save project (a self-contained `.beveled.json`), Undo / Redo, Toggle timeline (T), Templates and a keyboard shortcuts sheet.

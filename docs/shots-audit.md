@@ -37,3 +37,6 @@ Audited `https://shots.so/` on 2026-09-30 with a real browser screenshot loaded.
 - Shadow styles and opacity.
 - A **Palette** background that samples colours from the loaded screenshot, plus image backgrounds with blur.
 - Templates with real rendered preview images and an Animated filter.
+- Device count (1 · 2 · 3) with base layouts, as multi-device arrangements: row, fan, cascade, stack and tilt, each device with its own screen.
+- Scene shadow overlays (light through blinds, a window, leaves or palm fronds), as the Light Shadow effect; the leaves sway in video.
+- Background libraries (Glass, Cosmic, Abstract, …), as animated procedural shader backgrounds with editable colours.

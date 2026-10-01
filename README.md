@@ -23,7 +23,9 @@ The original 2D screenshot beautifier is still available at `/classic`.
 **Devices** — procedural models built from real-world dimensions (1 scene unit = 100 mm), with physically based finishes, coated camera lenses, buttons, ports, speaker grilles and more:
 iPhone 17 Pro, 17 Pro Max, 17 and Air · Pixel 10 Pro and Galaxy S25 Ultra · iPad Pro 13", iPad Pro 11" and iPad Air · MacBook Pro 14", 16" and MacBook Air 13" (adjustable lid, notch, instanced keyboard) · Studio Display and Pro Display XDR · Watch Ultra 3 and Watch Series 11 · a floating browser window (Safari / Chrome / Arc, light or dark) · a bare rounded screen · **your own .glb model** (meshes named "screen" or "display" receive the media).
 
-**Screen** — cover / contain / stretch fitting, landscape rotation, padding and letterbox colour, optional iOS status bar, glass reflection layer, image or looping video.
+**Multi-device** — two or three copies of the device in one shot (row, fan, cascade, stack or tilt), each with its own screenshot or video.
+
+**Screen** — cover / contain / stretch fitting, a keyframable **scroll** for long full-page screenshots, landscape rotation, padding and letterbox colour, optional iOS status bar, glass reflection layer, image or looping video.
 
 **Camera** — drag to orbit, scroll to zoom, shift-drag to pan; yaw, pitch, roll, FOV, zoom and pan sliders; seven camera presets.
 
@@ -32,24 +34,27 @@ iPhone 17 Pro, 17 Pro Max, 17 and Air · Pixel 10 Pro and Galaxy S25 Ultra · iP
 - **Simple** view: one row of clips with cut / fade transitions at every junction and drag handles for duration and order.
 - **Advanced** view: a track per clip; shots expand into keyframe lanes. Drag diamonds to retime, click the curve button between two keyframes for the bezier **easing editor** (In / In Out / Out and eight presets).
 - Every animatable slider has a ◇ keyframe button, and **Record keyframes** auto-keys every change at the playhead.
+- **Auto-motion**: drag focus areas on your screenshot and Beveled writes a camera path that glides between them (move / hold timing, zoom, alternating tilt, optional wide start and end, slow push-in).
 - **Motion presets**: scan left-to-right, top-to-bottom, low-angle pan up, slow zoom out, push in, overhead pan, out and back, fold up (opens a laptop lid), flat truck, orbit, hero reveal and spin reveal.
 - Idle loops (float, sway, spin, orbit) layer on top of keyframes.
 - Text cards: 30 fonts, weight, size, spacing, line height, alignment, colour, background; enter / exit per line, word or character with eleven effects; `{one|two|three}` word cycling.
 - Logo cards: upload a PNG/SVG, liquid-metal / gem-smoke / heatmap fills, fade / scale / blur / rise in and out.
 
-**Scene** — solid, linear, radial and image backgrounds (with blur and grain), a palette generated from your screenshot, 16 presets; seven Lightformer lighting setups built in-app (no HDR downloads) with keyframable rotation, tilt and intensity; contact shadows; reflective floor.
+**Scene** — six 3-D **environments** (concrete desk, oak desk, dark room, dark grid, dark concrete, bright studio cyclorama) with adjustable wall, distance and fog; solid, linear, radial and image backgrounds (with blur and grain); a library of 16 **animated shader backgrounds** (aurora, silk, mesh gradient, waves, prism, liquid chrome, dunes, swirl, bokeh, grain) that move with the timeline; a palette generated from your screenshot; seven Lightformer lighting setups built in-app (no HDR downloads) with keyframable rotation, tilt and intensity; contact shadows; reflective floor.
 
 **Depth** — tilt-shift, radial and directional focus blur with a draggable focus handle, plus true lens depth of field with autofocus on the screen.
 
-**Effects** — bloom, vignette, grain, chromatic aberration, sharpen, fish-eye, exposure, brightness, contrast, shadows, midtones, highlights, saturation and hue.
+**Effects** — an UltraMock-style stack: add effects with **+**, hide them with the eye, remove with **–**. Glass border, liquid glass (on the frame or the device body), light shadows (blinds, window, swaying leaves, palm fronds), screen fade, pixel grid, bloom (strength, threshold, radius), vignette, grain, chromatic aberration, sharpen and fish-eye. Post processing: exposure, brightness, contrast, shadows, midtones, highlights, saturation and hue.
 
 **Frames** — auto, 16:9, 1:1, 4:5, 9:16, 3:2, 4:3, 21:9, custom, and platform sizes for Instagram, X, YouTube, LinkedIn, Pinterest, Dribbble, Product Hunt and the App Store.
 
-**Templates** — 14 templates with rendered previews, including four animated multi-clip timelines (Product Launch, App Showcase, Feature Tour, Desk Reveal).
+**Templates** — 22 templates with rendered previews, including six animated multi-clip timelines (Aurora Launch, Desk Story, Product Launch, App Showcase, Feature Tour, Desk Reveal) and looks that use environments, multi-device layouts, light shadows and liquid glass.
 
-**Export** — PNG, JPEG or WebP at 1×–4× with optional transparency; **MP4 or WebM video of the whole timeline**, rendered frame by frame through WebCodecs (via mediabunny) at 720p–4K, 24/30/60 fps, with the audio track mixed in. Browsers without WebCodecs fall back to real-time WebM recording.
+**Export** — PNG, JPEG or WebP at 1×–4× with optional transparency; **MP4 or WebM video of the whole timeline**, rendered frame by frame through WebCodecs (via mediabunny) at 720p–4K, 24/30/60 fps, with the audio track mixed in, Low / Med / High / Ultra quality, optional **motion blur** (sub-frame accumulation) and **transparent WebM** (VP9 alpha). Browsers without WebCodecs fall back to real-time WebM recording.
 
-**Keyboard** — Space play/pause · ⌘/Ctrl+Z undo · ⇧⌘Z redo · ⌘/Ctrl+E export image · Home back to start · , and . step one frame · Delete removes the selected keyframe · Esc closes panels.
+**Projects** — save the whole project (timeline, every scene and all media embedded) to a `.beveled.json` file and open it again later; the working project also persists in the browser.
+
+**Keyboard** — Space play/pause · ⌘/Ctrl+Z undo · ⇧⌘Z redo · ⌘/Ctrl+E export image · ⌘S save project · ⌘O open project · T show/hide timeline · Home back to start · , and . step one frame · Delete removes the selected keyframe · ? shortcuts · Esc closes panels.
 
 ## Tech stack
 
@@ -68,8 +73,9 @@ src/
     presets.ts            # Devices, finishes, lighting, backgrounds, camera presets, frames, templates
     store.ts              # zustand store: project of clips, undo/redo, keyframing, playback, export requests
     timeline/             # Clip / keyframe types, easing, sampling, motion presets, text & logo card drawing
-    scene/                # R3F scene: device models, screen shader, camera rig, lights, background,
-                          #   floor, post-processing (custom focus blur, grade, fade), export bridge
+    scene/                # R3F scene: device models, screen shader, camera rig, lights, background shaders,
+                          #   environments, device groups, post-processing (focus blur, grade, glass,
+                          #   light shadows, pixel grid, fade), export bridge
     ui/                   # Top bar, icon rail, panels, stage, timeline, templates dialog
   editor/                 # Classic 2D editor (route /classic)
   popup/                  # Extension popup
@@ -78,6 +84,7 @@ src/
   App.tsx                 # Web app routes: home, /editor, /classic, /terms
 docs/                     # UltraMock and shots.so audits used as the product spec
 public/templates/         # Rendered template previews
+public/backgrounds/       # Thumbnails of the animated background library
 ```
 
 ## Getting started
@@ -109,6 +116,8 @@ pnpm lint      # Run ESLint
 - Each **shot** stores a full scene (device, camera, background, lighting, depth, effects, idle motion) plus keyframe tracks. The renderer always shows the clip under the playhead and samples keyframes every frame, so preview and export use the same code path.
 - Devices are built from millimetre specs in `src/mockup/scene/models.ts`. Screens use a shader that fits the media (cover / contain / stretch, padding, rotation).
 - Lighting is an environment map rendered from drei Lightformers, a studio dome and a front softbox, so no HDR files are downloaded.
+- Environments are a single swept floor–cove–wall mesh with procedurally generated concrete, wood, plaster and grid textures, faded into the backdrop with fog that starts just behind the device.
+- Auto-motion maps each focus area from media coordinates to the device's screen in world space (fit, padding, scroll, lid angle, device rotation and group placement), then solves for the camera zoom and pan that centre it.
 - Video export pauses the render loop and steps the timeline one frame at a time, drawing each frame into a WebCodecs encoder with exact timestamps. Video media are seeked per frame, so exports are deterministic.
 
 ## Deploying the web app (Vercel)
