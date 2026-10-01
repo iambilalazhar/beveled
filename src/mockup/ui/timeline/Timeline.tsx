@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Crosshair,
   Film,
   Minimize2,
   Maximize2,
@@ -220,6 +221,7 @@ function Toolbar() {
   const dup = useEditor((s) => s.duplicateClip)
   const remove = useEditor((s) => s.removeClip)
   const clipCount = useEditor((s) => s.project.clips.length)
+  const setAutoMotion = useEditor((s) => s.setAutoMotionOpen)
 
   return (
     <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-b border-white/[0.06] px-3 [scrollbar-width:none] [&>*]:shrink-0">
@@ -231,6 +233,14 @@ function Toolbar() {
         ))}
       </div>
       <PresetsMenu />
+      <button
+        type="button"
+        onClick={() => setAutoMotion(true)}
+        title="Draw focus areas on your screenshot and generate a camera path"
+        className={cn(mono, 'flex h-8 items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 text-white/80 hover:bg-white/10')}
+      >
+        <Crosshair className="size-3.5" /> Auto-motion
+      </button>
       {mode === 'advanced' && (
         <button
           type="button"

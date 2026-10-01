@@ -17,7 +17,7 @@ export const PANELS: PanelEntry[] = [
   { id: 'media', label: 'Media', icon: ImageIcon, component: MediaPanel },
   { id: 'device', label: 'Device', icon: Smartphone, component: DevicePanel },
   { id: 'camera', label: 'Camera', icon: Camera, component: CameraPanel },
-  { id: 'background', label: 'Background', icon: Palette, component: BackgroundPanel },
+  { id: 'background', label: 'Scene', icon: Palette, component: BackgroundPanel },
   { id: 'lighting', label: 'Lighting', icon: Sun, component: LightingPanel },
   { id: 'depth', label: 'Depth', icon: Aperture, component: DepthPanel },
   { id: 'effects', label: 'Effects', icon: Sparkles, component: EffectsPanel },

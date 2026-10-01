@@ -4,6 +4,13 @@ import { totalDuration } from '../../timeline/evaluate'
 import { useEditor, useScene } from '../../store'
 import { PanelButton, Row, Section, SegmentRow, SliderRow, SwitchRow, valueClass } from '../controls'
 
+const QUALITY = [
+  { label: 'Low', mbps: 4 },
+  { label: 'Med', mbps: 8 },
+  { label: 'High', mbps: 16 },
+  { label: 'Ultra', mbps: 32 },
+]
+
 function exportSize(canvas: { width: number; height: number }, frame: { aspect: string; customWidth: number; customHeight: number }, scale: number) {
   if (frame.aspect === 'custom') return { width: Math.round(frame.customWidth * scale), height: Math.round(frame.customHeight * scale) }
   return { width: Math.round(canvas.width * scale), height: Math.round(canvas.height * scale) }
@@ -92,10 +99,31 @@ export function ExportPanel() {
             { value: '60', label: '60 fps' },
           ]}
         />
+        <SegmentRow
+          value={String(QUALITY.find((q) => q.mbps === exp.videoBitrate)?.mbps ?? 'custom')}
+          onChange={(v) => update('export', { videoBitrate: Number(v) })}
+          options={QUALITY.map((q) => ({ value: String(q.mbps), label: q.label }))}
+        />
         <SliderRow label="Bitrate" value={exp.videoBitrate} min={2} max={60} step={1} onChange={(videoBitrate) => update('export', { videoBitrate })} format={(v) => `${v.toFixed(0)} Mbps`} />
+        <div className="space-y-1">
+          <div className="px-1 font-mono text-[9px] uppercase tracking-[0.12em] text-white/40">Motion blur</div>
+          <SegmentRow
+            value={String(exp.motionBlur)}
+            onChange={(v) => update('export', { motionBlur: Number(v) })}
+            options={[
+              { value: '1', label: 'Off' },
+              { value: '3', label: 'Low' },
+              { value: '5', label: 'Med' },
+              { value: '8', label: 'High' },
+            ]}
+          />
+        </div>
+        {exp.videoFormat === 'webm' && (
+          <SwitchRow label="Transparent video" checked={exp.videoAlpha && exp.transparent} onChange={(videoAlpha) => update('export', { videoAlpha, transparent: videoAlpha ? true : exp.transparent })} />
+        )}
         <Row label="Output">
           <span className={valueClass}>
-            {videoW} × {exp.videoHeight} · {total.toFixed(1)}s{hasAudio ? ' · audio' : ''}
+            {videoW} × {exp.videoHeight} · {total.toFixed(1)}s · {Math.round(total * exp.fps)} frames{hasAudio ? ' · audio' : ''}
           </span>
         </Row>
         {recording ? (
@@ -110,7 +138,9 @@ export function ExportPanel() {
             <Video className="size-3" /> Export {exp.videoFormat.toUpperCase()}
           </PanelButton>
         )}
-        <p className="px-1 font-mono text-[10px] leading-relaxed text-white/45">Renders the whole timeline frame by frame, so the video is smooth even on a slow machine. Keep this tab open until it finishes.</p>
+        <p className="px-1 font-mono text-[10px] leading-relaxed text-white/45">
+          Renders the whole timeline frame by frame, so the video is smooth even on a slow machine. Motion blur renders {exp.motionBlur}× the frames. Transparent video needs WebM (VP9) and a background set to None. Keep this tab open until it finishes.
+        </p>
       </Section>
     </div>
   )

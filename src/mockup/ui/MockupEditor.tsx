@@ -2,6 +2,9 @@ import { useEffect } from 'react'
 import { useEditor } from '../store'
 import { PanelHost, Rail } from './Rail'
 import { Stage } from './Stage'
+import { AutoMotionDialog } from './AutoMotionDialog'
+import { ShortcutsDialog } from './EditorMenu'
+import { pickProjectFile, saveProjectFile } from './projectFile'
 import { TemplatesDialog } from './TemplatesDialog'
 import { AudioPreview, Timeline } from './timeline/Timeline'
 import { TopBar } from './TopBar'
@@ -57,6 +60,16 @@ function useEditorKeyboard() {
       } else if (mod && (e.key === 'e' || e.key === 'E')) {
         e.preventDefault()
         s.requestExport()
+      } else if (mod && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        void saveProjectFile()
+      } else if (mod && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault()
+        pickProjectFile()
+      } else if (!mod && (e.key === 't' || e.key === 'T')) {
+        s.setTimelineOpen(!s.timelineOpen)
+      } else if (!mod && e.key === '?') {
+        s.setShortcutsOpen(true)
       } else if (e.key === ' ' && !mod) {
         e.preventDefault()
         s.togglePlay()
@@ -99,6 +112,8 @@ export function MockupEditor({ initialMedia = null }: MockupEditorProps) {
         </main>
       </div>
       <TemplatesDialog />
+      <AutoMotionDialog />
+      <ShortcutsDialog />
       <AudioPreview />
     </div>
   )

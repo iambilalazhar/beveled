@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { ASPECTS, FRAME_PRESETS } from '../presets'
 import { useEditor, useScene } from '../store'
 import { totalDuration } from '../timeline/evaluate'
+import { EditorMenu } from './EditorMenu'
 
 function IconButton({ onClick, disabled, title, children, className }: { onClick?: () => void; disabled?: boolean; title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -198,6 +199,7 @@ export function TopBar() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0d0d0f] px-3">
+      <EditorMenu />
       <a href="/" className="flex items-center gap-2 pr-2" title="Beveled home">
         <img src="/beveled_icon.png" alt="" width={20} height={20} />
         <span className="logo-wordmark text-[15px] lowercase">beveled</span>

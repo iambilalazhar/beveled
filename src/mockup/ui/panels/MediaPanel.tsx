@@ -2,7 +2,7 @@ import { isExtensionRuntime } from '@/lib/env'
 import { Clapperboard, ImageIcon, Trash2, Upload } from 'lucide-react'
 import { useRef } from 'react'
 import { useEditor, useScene } from '../../store'
-import { PanelButton, Row, Section, SegmentRow, labelClass, valueClass } from '../controls'
+import { AnimSliderRow, PanelButton, Row, Section, SegmentRow, labelClass, valueClass } from '../controls'
 import { ACCEPT, useMediaLoader } from '../useMediaLoader'
 
 export function MediaPanel() {
@@ -74,8 +74,11 @@ export function MediaPanel() {
             { value: 'stretch', label: 'Stretch' },
           ]}
         />
+        {device.fit === 'cover' && (
+          <AnimSliderRow animKey="device.scroll" label="Scroll" min={0} max={1} step={0.001} onChange={(scroll) => update('device', { scroll })} format={(v) => `${Math.round(v * 100)}%`} />
+        )}
         <p className={labelClass + ' px-1 normal-case tracking-normal text-white/40'}>
-          Cover fills the screen and crops. Contain shows the whole image with black bars. Stretch ignores the aspect ratio.
+          Scroll moves through screenshots taller than the screen (keyframe it for a scrolling video). Cover fills the screen and crops. Contain shows the whole image with black bars. Stretch ignores the aspect ratio.
         </p>
       </Section>
 

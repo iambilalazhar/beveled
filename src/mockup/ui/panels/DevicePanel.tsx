@@ -1,11 +1,53 @@
 import { cn } from '@/lib/utils'
-import { Upload } from 'lucide-react'
+import { Upload, X } from 'lucide-react'
 import { useRef } from 'react'
 import { DEFAULT_SCENE, DEVICE_BY_KIND, FINISH_BY_ID } from '../../presets'
 import { MODELS, modelFor } from '../../scene/models'
 import { useEditor, useScene } from '../../store'
 import { AnimSliderRow, ColorRow, PanelButton, Section, SegmentRow, SliderRow, SwitchRow } from '../controls'
 import { DEVICE_ICONS } from '../deviceIcons'
+import { ACCEPT, loadSlotFile } from '../useMediaLoader'
+import type { GroupArrangement, MediaState } from '../../types'
+
+const ARRANGEMENTS: { id: GroupArrangement; label: string; preview: string[] }[] = [
+  { id: 'row', label: 'Row', preview: ['translate(-130%,0)', 'translate(0,0)', 'translate(130%,0)'] },
+  { id: 'fan', label: 'Fan', preview: ['translate(-80%,8%) rotate(-10deg) scale(.9)', 'translate(0,0)', 'translate(80%,8%) rotate(10deg) scale(.9)'] },
+  { id: 'cascade', label: 'Cascade', preview: ['translate(-60%,6%)', 'translate(0,-4%) scale(.88)', 'translate(55%,-12%) scale(.76)'] },
+  { id: 'stack', label: 'Stack', preview: ['translate(-62%,0) scale(.85)', 'translate(0,0)', 'translate(62%,0) scale(.85)'] },
+  { id: 'tilt', label: 'Tilt', preview: ['translate(-100%,0) skewY(12deg)', 'translate(0,0) skewY(12deg)', 'translate(100%,0) skewY(12deg)'] },
+]
+
+function SlotScreen({ slot, media }: { slot: 2 | 3; media: MediaState | null }) {
+  const update = useEditor((s) => s.update)
+  const ref = useRef<HTMLInputElement>(null)
+  return (
+    <div className="flex h-11 items-center gap-2 rounded-lg bg-white/[0.05] px-2">
+      <span className="w-14 font-mono text-[10px] uppercase tracking-[0.08em] text-white/60">Device {slot}</span>
+      <button type="button" onClick={() => ref.current?.click()} className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-1 py-1 text-left hover:bg-white/[0.06]">
+        <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded bg-black/50">
+          {media?.url && media.kind === 'image' ? <img src={media.url} alt="" className="size-full object-cover" /> : <Upload className="size-3 text-white/50" />}
+        </span>
+        <span className="truncate font-mono text-[10px] text-white/70">{media?.name ?? 'Same as main · upload'}</span>
+      </button>
+      {media && (
+        <button type="button" title="Use the main screen" onClick={() => update('group', { [slot === 2 ? 'media2' : 'media3']: null })} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+          <X className="size-3" />
+        </button>
+      )}
+      <input
+        ref={ref}
+        type="file"
+        accept={ACCEPT}
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) void loadSlotFile(f, slot)
+          e.target.value = ''
+        }}
+      />
+    </div>
+  )
+}
 
 const FAMILIES = [
   { kind: 'phone', label: 'iPhone' },
@@ -21,6 +63,7 @@ const FAMILIES = [
 
 export function DevicePanel() {
   const device = useScene('device')
+  const group = useScene('group')
   const update = useEditor((s) => s.update)
   const meta = DEVICE_BY_KIND[device.kind]
   const model = modelFor(device.kind, device.model)
@@ -86,6 +129,43 @@ export function DevicePanel() {
           </div>
         </Section>
       )}
+
+      <Section title="Layout" onReset={() => update('group', { count: 1, arrangement: 'fan', spacing: 0.5 })}>
+        <SegmentRow
+          value={String(group.count)}
+          onChange={(v) => update('group', { count: Number(v) as 1 | 2 | 3 })}
+          options={[
+            { value: '1', label: '1 device' },
+            { value: '2', label: '2 devices' },
+            { value: '3', label: '3 devices' },
+          ]}
+        />
+        {group.count > 1 && (
+          <>
+            <div className="grid grid-cols-5 gap-1">
+              {ARRANGEMENTS.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  title={a.label}
+                  onClick={() => update('group', { arrangement: a.id })}
+                  className={cn('flex flex-col items-center gap-1 rounded-lg border py-1.5', group.arrangement === a.id ? 'border-primary/80 bg-primary/10' : 'border-white/[0.06] bg-white/[0.04] hover:border-white/20')}
+                >
+                  <span className="relative flex h-7 w-full items-center justify-center">
+                    {(group.count === 2 ? [a.preview[0], a.preview[2]] : a.preview).map((t, i) => (
+                      <span key={i} className="absolute h-6 w-3 rounded-[3px] border border-white/50 bg-white/15" style={{ transform: t }} />
+                    ))}
+                  </span>
+                  <span className="font-mono text-[8px] uppercase tracking-wider text-white/60">{a.label}</span>
+                </button>
+              ))}
+            </div>
+            <SliderRow label="Spacing" value={group.spacing} min={0} max={1.5} step={0.01} onChange={(spacing) => update('group', { spacing })} />
+            <SlotScreen slot={2} media={group.media2} />
+            {group.count === 3 && <SlotScreen slot={3} media={group.media3} />}
+          </>
+        )}
+      </Section>
 
       {device.kind === 'custom' && (
         <Section title="Custom model">

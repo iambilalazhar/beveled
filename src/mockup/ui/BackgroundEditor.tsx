@@ -1,7 +1,7 @@
 import { ImagePlus, Plus, Wand2, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { BACKGROUND_PRESETS } from '../presets'
-import type { BackgroundKind, BackgroundState } from '../types'
+import { BACKGROUND_PRESETS, SHADER_PRESETS } from '../presets'
+import type { BackgroundKind, BackgroundState, ShaderBgId } from '../types'
 import { cssBackground } from './backgroundCss'
 import { ColorRow, Section, SegmentRow, SliderRow, Tile, TileGrid } from './controls'
 import { extractPalette, paletteBackgrounds } from './palette'
@@ -26,6 +26,7 @@ export function BackgroundEditor({
 }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [palette, setPalette] = useState<{ src: string; colors: string[] } | null>(null)
+  const activeShader = bg.kind === 'shader' ? SHADER_PRESETS.find((p) => p.shader === bg.shader && p.colors.join() === bg.colors.join())?.id : undefined
   const activePreset = BACKGROUND_PRESETS.find((p) => p.kind === bg.kind && p.colors.join() === bg.colors.join())?.id
 
   useEffect(() => {
@@ -50,6 +51,7 @@ export function BackgroundEditor({
     { value: 'solid', label: 'Solid' },
     { value: 'linear', label: 'Linear' },
     { value: 'radial', label: 'Radial' },
+    { value: 'shader', label: 'Motion' },
     { value: 'image', label: 'Image' },
   ]
   if (allowTransparent) kinds.push({ value: 'transparent', label: 'None' })
@@ -83,12 +85,37 @@ export function BackgroundEditor({
         </TileGrid>
       </Section>
 
+      <Section title="Library">
+        <div className="grid grid-cols-4 gap-1">
+          {SHADER_PRESETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              title={`${p.label} · animated`}
+              onClick={() => onChange({ kind: 'shader', shader: p.shader, colors: p.colors, speed: p.speed })}
+              className={`relative h-12 overflow-hidden rounded-md ring-1 transition ${activeShader === p.id ? 'ring-2 ring-primary' : 'ring-white/10 hover:ring-white/30'}`}
+              style={{ background: cssBackground('linear', p.colors, 135) }}
+            >
+              <img src={`/backgrounds/${p.id}.jpg`} alt="" loading="lazy" className="absolute inset-0 size-full object-cover" onError={(e) => (e.currentTarget.style.display = 'none')} />
+              <span className="absolute inset-x-0 bottom-0 bg-black/45 px-1 py-px text-left font-mono text-[7px] uppercase tracking-wider text-white/85">{p.label}</span>
+            </button>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Type">
         <SegmentRow
           value={bg.kind}
           onChange={(kind) => {
             if (kind === 'image' && !bg.image) fileRef.current?.click()
-            const colors = kind === 'solid' ? bg.colors.slice(0, 1) : bg.colors.length < 2 ? [bg.colors[0] ?? '#111', '#000000'] : bg.colors
+            const colors =
+              kind === 'solid'
+                ? bg.colors.slice(0, 1)
+                : kind === 'shader' && bg.colors.length < 3
+                  ? [...bg.colors, '#e05d38', '#6366f1'].slice(0, 3)
+                  : bg.colors.length < 2
+                    ? [bg.colors[0] ?? '#111', '#000000']
+                    : bg.colors
             onChange({ kind, colors })
           }}
           options={kinds}
@@ -112,11 +139,29 @@ export function BackgroundEditor({
         </Section>
       )}
 
+      {bg.kind === 'shader' && (
+        <Section title="Motion background">
+          <div className="grid grid-cols-5 gap-1">
+            {(['aurora', 'silk', 'mesh', 'waves', 'prism', 'chrome', 'dunes', 'swirl', 'bokeh', 'grain'] as ShaderBgId[]).map((id) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => onChange({ shader: id, colors: bg.colors.length >= 3 ? bg.colors : [...bg.colors, '#ffffff', '#888888'].slice(0, 3) })}
+                className={`h-7 rounded-md font-mono text-[8px] uppercase tracking-wider ${bg.shader === id ? 'bg-white/[0.14] text-white' : 'bg-white/[0.04] text-white/55 hover:text-white'}`}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
+          <SliderRow label="Speed" value={bg.speed} min={0} max={2} step={0.01} onChange={(speed) => onChange({ speed })} />
+        </Section>
+      )}
+
       {bg.kind !== 'transparent' && bg.kind !== 'image' && (
         <Section
           title="Colours"
           action={
-            bg.kind !== 'solid' && bg.colors.length < 3 ? (
+            bg.kind !== 'solid' && bg.kind !== 'shader' && bg.colors.length < 3 ? (
               <button type="button" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white" onClick={() => onChange({ colors: [...bg.colors, '#000000'] })} title="Add colour stop">
                 <Plus className="size-3" />
               </button>
@@ -128,7 +173,7 @@ export function BackgroundEditor({
               <div className="flex-1">
                 <ColorRow label={bg.kind === 'solid' ? 'Colour' : `Stop ${i + 1}`} value={c} onChange={(hex) => setColor(i, hex)} />
               </div>
-              {bg.kind !== 'solid' && bg.colors.length > 2 && (
+              {bg.kind !== 'solid' && bg.kind !== 'shader' && bg.colors.length > 2 && (
                 <button type="button" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white" onClick={() => onChange({ colors: bg.colors.filter((_, j) => j !== i) })} title="Remove stop">
                   <X className="size-3" />
                 </button>

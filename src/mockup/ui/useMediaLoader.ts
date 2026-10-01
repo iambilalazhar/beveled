@@ -4,11 +4,30 @@ import { useEditor } from '../store'
 import type { MediaKind } from '../types'
 
 let currentObjectUrl: string | null = null
+const slotObjectUrls: Record<number, string> = {}
 
 function releaseObjectUrl() {
   if (currentObjectUrl) {
     URL.revokeObjectURL(currentObjectUrl)
     currentObjectUrl = null
+  }
+}
+
+/** Loads a file onto device 2 or 3 of a multi-device shot. */
+export async function loadSlotFile(file: File, slot: 2 | 3) {
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return
+  const kind: MediaKind = file.type.startsWith('video/') ? 'video' : 'image'
+  const url = URL.createObjectURL(file)
+  try {
+    const dims = kind === 'video' ? await probeVideo(url) : await probeImage(url)
+    const prev = slotObjectUrls[slot]
+    slotObjectUrls[slot] = url
+    useEditor.getState().update('group', { [slot === 2 ? 'media2' : 'media3']: { url, kind, width: dims.width, height: dims.height, name: file.name } })
+    // Revoke later: the previous texture may still be on screen for a frame.
+    if (prev) window.setTimeout(() => URL.revokeObjectURL(prev), 5000)
+  } catch {
+    URL.revokeObjectURL(url)
+    useEditor.getState().setStatus('Could not load that file')
   }
 }
 
