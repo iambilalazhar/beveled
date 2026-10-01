@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import './App.css'
 import { Github } from 'lucide-react'
 
-const MockupEditor = lazy(() => import('@/mockup/ui/MockupEditor'))
+const Studio = lazy(() => import('@/studio/Studio'))
 const ClassicEditor = lazy(() => import('@/editor/Editor'))
 
 type RoutePath = '/' | '/editor' | '/classic' | '/terms'
@@ -50,10 +50,10 @@ function HomePage(props: { onUpload: (blob: Blob) => void; goTo: (p: RoutePath) 
               <h1 className="text-5xl logo-wordmark lowercase">beveled</h1>
             </div>
             <h1 className="mb-8 text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-gray-900 dark:text-white">
-              Turn Screenshots Into 3D Device Mockups
+              Turn Screenshots Into 2D & 3D Mockups
             </h1>
             <p className="text-gray-600 dark:text-gray-400 max-w-lg mx-auto">
-              Drop a screenshot or screen recording onto an iPhone, iPad, MacBook, display, browser window or watch. Orbit the camera, dial in studio lighting, depth of field and motion, then export a crisp PNG, WebP or WebM — all rendered locally in your browser.
+              Frame a screenshot in a browser window or flat device on a beautiful background, or drop it onto a 3D iPhone, iPad, MacBook or display with studio lighting and camera moves. Animate it, then export a crisp image or video — all rendered locally in your browser.
             </p>
           </div>
           
@@ -314,8 +314,8 @@ function App() {
   const [initialImage, setInitialImage] = useState<Blob | string | null>(null)
 
   useEffect(() => {
-    if (route === '/') document.title = 'Beveled – 3D device mockups from your screenshots'
-    if (route === '/editor') document.title = 'Beveled – 3D Mockup Editor'
+    if (route === '/') document.title = 'Beveled – 2D & 3D mockups from your screenshots'
+    if (route === '/editor') document.title = 'Beveled – Mockup Studio'
     if (route === '/classic') document.title = 'Beveled – Classic Editor'
   }, [route])
 
@@ -328,7 +328,7 @@ function App() {
   if (route === '/editor')
     return (
       <Suspense fallback={<EditorFallback />}>
-        <MockupEditor initialMedia={initialImage} />
+        <Studio initialMedia={initialImage} />
       </Suspense>
     )
   if (route === '/classic')

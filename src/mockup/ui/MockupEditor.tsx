@@ -13,6 +13,8 @@ import { useInitialMedia, useMediaLoader, usePasteMedia } from './useMediaLoader
 export type MockupEditorProps = {
   /** Media to load on mount (web app upload). Ignored inside the extension, which reads the latest capture instead. */
   initialMedia?: Blob | string | null
+  /** Load the initial media / extension capture / ?media= link on mount (off after a 2D ↔ 3D switch). */
+  loadInitial?: boolean
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -89,7 +91,7 @@ function useEditorKeyboard() {
   }, [])
 }
 
-export function MockupEditor({ initialMedia = null }: MockupEditorProps) {
+export function MockupEditor({ initialMedia = null, loadInitial = true }: MockupEditorProps) {
   useForcedDarkTheme()
   useEffect(() => {
     // Dev-only hook so scripted visual checks can drive the store.
@@ -98,7 +100,7 @@ export function MockupEditor({ initialMedia = null }: MockupEditorProps) {
   useEditorKeyboard()
   const { loadUrl, loadBlob, loadFiles } = useMediaLoader()
   usePasteMedia(loadFiles)
-  useInitialMedia(initialMedia, loadUrl, loadBlob)
+  useInitialMedia(initialMedia, loadUrl, loadBlob, loadInitial)
 
   return (
     <div className="dark fixed inset-0 flex flex-col overflow-hidden bg-[#0a0a0a] text-white antialiased" style={{ colorScheme: 'dark' }}>

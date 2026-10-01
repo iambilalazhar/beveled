@@ -6,6 +6,7 @@ import { ASPECTS, FRAME_PRESETS } from '../presets'
 import { useEditor, useScene } from '../store'
 import { totalDuration } from '../timeline/evaluate'
 import { EditorMenu } from './EditorMenu'
+import { ModeSwitch } from '@/studio/ModeSwitch'
 
 function IconButton({ onClick, disabled, title, children, className }: { onClick?: () => void; disabled?: boolean; title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -203,8 +204,8 @@ export function TopBar() {
       <a href="/" className="flex items-center gap-2 pr-2" title="Beveled home">
         <img src="/beveled_icon.png" alt="" width={20} height={20} />
         <span className="logo-wordmark text-[15px] lowercase">beveled</span>
-        <span className="rounded bg-primary/15 px-1.5 py-px font-mono text-[9px] font-semibold uppercase tracking-wider text-primary">3D</span>
       </a>
+      <ModeSwitch />
       <div className="mx-1 h-5 w-px bg-white/10" />
       <IconButton onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">
         <Undo2 className="size-4" />
