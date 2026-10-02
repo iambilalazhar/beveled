@@ -302,7 +302,7 @@ function Shapes({ frame }: { frame: FrameState2D }) {
   )
 }
 
-/** Headline, subtitle, eyebrow and badge drawn into a frame-sized canvas. */
+/** Headline, subtitle, eyebrow and badge drawn into a frame-sized canvas, animated per line / word / letter. */
 function TextLayer({ text, frame }: { text: TextState2D; frame: FrameState2D }) {
   const size = useThree((s) => s.size)
   const aspect = size.width / Math.max(1, size.height)
@@ -314,34 +314,53 @@ function TextLayer({ text, frame }: { text: TextState2D; frame: FrameState2D }) 
       cancelled = true
     }
   }, [text.font, text.bodyFont, text.weight])
+  const k = Math.min(2, 4096 / Math.max(frame.width, frame.height))
+  const W = Math.round(frame.width * k)
+  const H = Math.round(frame.height * k)
+  const region = useMemo(() => {
+    const r = splitRegions(text.placement, text.area).text
+    return { x: r.x * W, y: r.y * H, w: r.w * W, h: r.h * H }
+  }, [text.placement, text.area, W, H])
   const canvas = useMemo(() => {
-    const k = Math.min(2, 4096 / Math.max(frame.width, frame.height))
-    const W = Math.round(frame.width * k)
-    const H = Math.round(frame.height * k)
     const c = document.createElement('canvas')
     c.width = W
     c.height = H
-    const r = splitRegions(text.placement, text.area).text
-    drawTextBlock(c.getContext('2d')!, W, H, text, { x: r.x * W, y: r.y * H, w: r.w * W, h: r.h * H })
     return c
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [text, frame.width, frame.height, fontsTick])
+  }, [W, H])
+  const draw = (time: number | null) => {
+    const ctx = canvas.getContext('2d')!
+    ctx.clearRect(0, 0, W, H)
+    return drawTextBlock(ctx, W, H, text, region, time)
+  }
+  // Final (static) state, redrawn on every change; also publishes the block's bounds for dragging.
   const texture = useTexture(canvas)
-  const mat = useRef<THREE.MeshBasicMaterial>(null)
-  const mesh = useRef<THREE.Mesh>(null)
+  useEffect(() => {
+    const b = draw(null)
+    if (texture) texture.needsUpdate = true
+    useShots.getState().setTextBounds(b ? { x: b.x / W, y: b.y / H, w: b.w / W, h: b.h / H } : null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, region, canvas, texture, fontsTick])
+  useEffect(() => () => useShots.getState().setTextBounds(null), [])
+  const animatedRef = useRef(false)
   useFrame(() => {
+    if (!texture) return
     const s = useShots.getState()
-    // Fade up at the start of playback / video; always fully visible while editing and in stills.
-    const k = text.animate && (s.playing || s.recording) ? Math.min(1, Math.max(0, (s.time - 0.1) / 0.7)) : 1
-    const e = 1 - Math.pow(1 - k, 3)
-    if (mat.current) mat.current.opacity = e
-    if (mesh.current) mesh.current.position.y = (1 - e) * -0.05
+    const on = text.animate !== false && text.enter !== 'none' && (s.playing || s.recording) && s.time < text.enterDuration + 0.05
+    if (on) {
+      draw(s.time)
+      texture.needsUpdate = true
+      animatedRef.current = true
+    } else if (animatedRef.current) {
+      draw(null)
+      texture.needsUpdate = true
+      animatedRef.current = false
+    }
   })
   if (!texture) return null
   return (
-    <mesh ref={mesh} renderOrder={text.placement === 'overlay' ? 950 : -100}>
+    <mesh renderOrder={950}>
       <planeGeometry args={[2 * aspect, 2]} />
-      <meshBasicMaterial ref={mat} map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
+      <meshBasicMaterial map={texture} transparent depthTest={false} depthWrite={false} toneMapped={false} />
     </mesh>
   )
 }

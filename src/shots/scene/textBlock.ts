@@ -82,8 +82,26 @@ function layoutBlock(ctx: CanvasRenderingContext2D, t: TextState2D, kind: Block[
   return { kind, lines, size, lineHeight: lh, gapAfter, height: lines.length * lh + padY * 2, width: Math.max(...lines.map((l) => l.width)) }
 }
 
-/** Draws the eyebrow / headline / subtitle / badge stack into `region` (pixels), shrinking it until it fits. */
-export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: number, t: TextState2D, region: Region) {
+export type Bounds = { x: number; y: number; w: number; h: number }
+
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
+const easeOut = (v: number) => 1 - Math.pow(1 - clamp01(v), 3)
+
+/** Entrance progress (0..1) of unit i of n at time t, staggered over `duration`. */
+export function unitProgress(t: number, i: number, n: number, duration: number) {
+  if (duration <= 0) return 1
+  if (n <= 1) return easeOut(t / duration)
+  const each = duration * 0.45
+  const delay = (i / Math.max(1, n - 1)) * (duration - each)
+  return easeOut((t - delay) / each)
+}
+
+/**
+ * Draws the eyebrow / headline / subtitle / badge stack into `region` (pixels), shrinking it until it fits.
+ * `time` (seconds since the entrance started) animates it; pass null for the final state.
+ * Returns the bounds of the block in pixels.
+ */
+export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: number, t: TextState2D, region: Region, time: number | null = null): Bounds | null {
   const short = Math.min(W, H)
   const vertical = t.placement === 'left' || t.placement === 'right'
   const padX = vertical ? region.w * 0.12 : Math.max(region.w * 0.07, short * 0.05)
@@ -104,8 +122,47 @@ export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: numbe
     if (total <= region.h * 0.86) break
     k *= 0.9
   }
-  let y = region.y + (region.h - total) / 2
-  const lineX = (w: number) => (t.align === 'left' ? region.x + padX : t.align === 'right' ? region.x + region.w - padX - w : region.x + region.w / 2 - w / 2)
+  if (!blocks.length) return null
+  const ox = t.offsetX * W
+  const oy = t.offsetY * H
+  let y = region.y + (region.h - total) / 2 + oy
+  const lineX = (w: number) => ox + (t.align === 'left' ? region.x + padX : t.align === 'right' ? region.x + region.w - padX - w : region.x + region.w / 2 - w / 2)
+
+  // Entrance: count animation units for the chosen granularity.
+  const mode = t.animate === false ? 'none' : t.enter
+  const animating = time !== null && mode !== 'none'
+  const per = mode === 'lines' ? 'line' : mode === 'words' || mode === 'pop' ? 'word' : mode === 'letters' ? 'char' : 'block'
+  let units = 0
+  for (const b of blocks) {
+    if (b.kind === 'badge') units += 1
+    else if (per === 'line') units += b.lines.length
+    else if (per === 'word') units += b.lines.reduce((a, l) => a + l.tokens.length, 0)
+    else if (per === 'char') units += b.lines.reduce((a, l) => a + l.tokens.reduce((c, tk) => c + tk.text.length, 0), 0)
+  }
+  if (per === 'block') units = 1
+  let unit = 0
+  const blockProgress = animating ? unitProgress(time!, 0, 1, t.enterDuration) : 1
+  /** Applies the entrance transform for one unit; returns false when the unit is invisible. */
+  const enter = (cx: number, cy: number, size: number, progress: number) => {
+    if (!animating) return true
+    const p = per === 'block' ? blockProgress : progress
+    if (p <= 0.001) return false
+    ctx.globalAlpha = p
+    if (mode === 'rise' || mode === 'lines' || mode === 'words') ctx.translate(0, (1 - p) * size * 0.55)
+    if (mode === 'pop') {
+      const sc = 0.6 + 0.4 * p + Math.sin(p * Math.PI) * 0.08
+      ctx.translate(cx, cy)
+      ctx.scale(sc, sc)
+      ctx.translate(-cx, -cy)
+    }
+    if ((mode === 'blur' || mode === 'words') && p < 1) ctx.filter = `blur(${(1 - p) * size * (mode === 'blur' ? 0.25 : 0.12)}px)`
+    return true
+  }
+  const nextProgress = () => (animating ? unitProgress(time!, unit++, units, t.enterDuration) : 1)
+
+  let minX = Infinity
+  let maxX = -Infinity
+  const top = y
   ctx.textBaseline = 'alphabetic'
   ctx.textAlign = 'left'
   for (const b of blocks) {
@@ -113,13 +170,20 @@ export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: numbe
       const padH = b.size * 1.1
       const w = b.width + padH * 2
       const x = lineX(w)
-      ctx.fillStyle = t.accent
-      ctx.beginPath()
-      ctx.roundRect(x, y, w, b.height, b.height / 2)
-      ctx.fill()
-      ctx.fillStyle = t.badgeText
-      ctx.font = fontFor(t, 'badge', b.size, false)
-      ctx.fillText(b.lines[0].tokens.map((tk) => tk.text).join(' '), x + padH, y + b.height / 2 + b.size * 0.36)
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x + w)
+      const p = nextProgress()
+      ctx.save()
+      if (enter(x + w / 2, y + b.height / 2, b.size, p)) {
+        ctx.fillStyle = t.accent
+        ctx.beginPath()
+        ctx.roundRect(x, y, w, b.height, b.height / 2)
+        ctx.fill()
+        ctx.fillStyle = t.badgeText
+        ctx.font = fontFor(t, 'badge', b.size, false)
+        ctx.fillText(b.lines[0].tokens.map((tk) => tk.text).join(' '), x + padH, y + b.height / 2 + b.size * 0.36)
+      }
+      ctx.restore()
       y += b.height + b.gapAfter
       continue
     }
@@ -127,23 +191,49 @@ export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: numbe
     const spacing = b.kind === 'headline' ? (t.spacing / 100) * b.size : b.kind === 'eyebrow' ? b.size * 0.14 : 0
     for (const line of b.lines) {
       let x = lineX(line.width)
+      minX = Math.min(minX, x)
+      maxX = Math.max(maxX, x + line.width)
       const baseline = y + b.lineHeight * 0.5 + b.size * 0.35
+      const lineP = per === 'line' ? nextProgress() : 1
       line.tokens.forEach((tok, i) => {
         if (i > 0) x += tok.space
-        ctx.font = fontFor(t, b.kind, b.size, tok.hl)
-        setSpacing(ctx, spacing)
-        if (tok.hl && b.kind === 'headline' && t.highlight === 'marker') {
-          const pad = b.size * 0.1
-          ctx.fillStyle = t.accent
-          ctx.beginPath()
-          ctx.roundRect(x - pad, baseline - b.size * 0.8, tok.width + pad * 2 + (line.tokens[i + 1]?.hl ? tok.space : 0), b.size * 1.0, b.size * 0.14)
-          ctx.fill()
-          ctx.fillStyle = t.badgeText
-        } else ctx.fillStyle = tok.hl && b.kind === 'headline' ? t.accent : color
-        if (tok.hl && b.kind === 'headline' && t.highlight === 'underline') {
-          ctx.fillRect(x, baseline + b.size * 0.1, tok.width + (line.tokens[i + 1]?.hl ? tok.space : 0), Math.max(2, b.size * 0.07))
+        const hl = tok.hl && b.kind === 'headline'
+        const wordP = per === 'word' ? nextProgress() : lineP
+        const drawToken = (text: string, tx: number, tw: number, p: number, withDecor: boolean) => {
+          ctx.save()
+          if (enter(tx + tw / 2, baseline - b.size * 0.35, b.size, p)) {
+            ctx.font = fontFor(t, b.kind, b.size, tok.hl)
+            setSpacing(ctx, spacing)
+            if (withDecor && hl && t.highlight === 'marker') {
+              const pad = b.size * 0.1
+              ctx.fillStyle = t.accent
+              ctx.beginPath()
+              ctx.roundRect(tx - pad, baseline - b.size * 0.8, tw + pad * 2 + (line.tokens[i + 1]?.hl ? tok.space : 0), b.size * 1.0, b.size * 0.14)
+              ctx.fill()
+            }
+            ctx.fillStyle = hl ? (t.highlight === 'marker' ? t.badgeText : t.accent) : color
+            if (withDecor && hl && t.highlight === 'underline') ctx.fillRect(tx, baseline + b.size * 0.1, tw + (line.tokens[i + 1]?.hl ? tok.space : 0), Math.max(2, b.size * 0.07))
+            ctx.fillText(text, tx, baseline)
+          }
+          ctx.restore()
         }
-        ctx.fillText(tok.text, x, baseline)
+        if (per === 'char' && animating) {
+          ctx.font = fontFor(t, b.kind, b.size, tok.hl)
+          setSpacing(ctx, spacing)
+          let cx = x
+          // Decorations ride on the first character.
+          for (let ci = 0; ci < tok.text.length; ci++) {
+            const ch = tok.text[ci]
+            const cw = ctx.measureText(ch).width
+            drawToken(ch, cx, ci === 0 ? tok.width : cw, nextProgress(), ci === 0)
+            ctx.font = fontFor(t, b.kind, b.size, tok.hl)
+            setSpacing(ctx, spacing)
+            cx += cw
+          }
+        } else {
+          if (per === 'char') unit += tok.text.length
+          drawToken(tok.text, x, tok.width, wordP, true)
+        }
         x += tok.width
       })
       setSpacing(ctx, 0)
@@ -151,4 +241,5 @@ export function drawTextBlock(ctx: CanvasRenderingContext2D, W: number, H: numbe
     }
     y += b.gapAfter
   }
+  return { x: minX, y: top, w: maxX - minX, h: y - top }
 }

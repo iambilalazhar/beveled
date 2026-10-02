@@ -113,14 +113,28 @@ export type TextState2D = {
   uppercase: boolean
   /** Share of the frame reserved for the text (top / bottom: height, left / right: width). */
   area: number
-  /** Fade the text up at the start of videos. */
+  /** Legacy switch: false turns the entrance off. */
   animate: boolean
+  /** Entrance in videos and playback. */
+  enter: TextEnter
+  /** Seconds the entrance takes. */
+  enterDuration: number
+  /** Drag offset of the text block, in fractions of the frame. */
+  offsetX: number
+  offsetY: number
 }
+
+export type TextEnter = 'none' | 'fade' | 'rise' | 'lines' | 'words' | 'letters' | 'blur' | 'pop'
+
+/** One screen of a multi-screen set (e.g. an App Store listing): its media and its own copy. */
+export type SetItem = { id: string; media: MediaState | null; eyebrow: string; headline: string; subtitle: string }
 
 export type ShotsProject = {
   mockup: MockupState
   frame: FrameState2D
   text: TextState2D
+  /** Screens that share this design and export together. */
+  set: SetItem[]
   base: Layout2D
   steps: AnimStep[]
   export: ShotsExport

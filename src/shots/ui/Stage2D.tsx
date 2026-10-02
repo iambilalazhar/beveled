@@ -6,6 +6,50 @@ import { editedLayout, useShots } from '../store'
 import { loadShotsFiles } from './useShotsMedia'
 
 const PAD = 32
+
+/** Drag handle over the text block: move the copy anywhere, double-click to edit it. */
+function TextHandle({ w, h }: { w: number; h: number }) {
+  const bounds = useShots((s) => s.textBounds)
+  const tab = useShots((s) => s.tab)
+  const setText = useShots((s) => s.setText)
+  const setTab = useShots((s) => s.setTab)
+  if (!bounds || bounds.w <= 0) return null
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation()
+    const el = e.currentTarget
+    el.setPointerCapture(e.pointerId)
+    const start = { x: e.clientX, y: e.clientY }
+    const t0 = useShots.getState().project.text
+    const move = (ev: PointerEvent) => {
+      let ox = t0.offsetX + (ev.clientX - start.x) / Math.max(1, w)
+      let oy = t0.offsetY + (ev.clientY - start.y) / Math.max(1, h)
+      // Snap back to the natural position when close to it.
+      if (Math.abs(ox) < 0.012) ox = 0
+      if (Math.abs(oy) < 0.012) oy = 0
+      setText({ offsetX: Math.max(-1, Math.min(1, ox)), offsetY: Math.max(-1, Math.min(1, oy)) })
+    }
+    const up = () => {
+      el.removeEventListener('pointermove', move)
+      el.removeEventListener('pointerup', up)
+      el.removeEventListener('pointercancel', up)
+    }
+    el.addEventListener('pointermove', move)
+    el.addEventListener('pointerup', up)
+    el.addEventListener('pointercancel', up)
+  }
+  const pad = 8
+  return (
+    <div
+      title="Drag to move the text · double-click to edit"
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => setTab('text')}
+      className={cn('group absolute z-10 cursor-move rounded-md border border-dashed', tab === 'text' ? 'border-primary/70' : 'border-transparent hover:border-white/60')}
+      style={{ left: bounds.x * w - pad, top: bounds.y * h - pad, width: bounds.w * w + pad * 2, height: bounds.h * h + pad * 2 }}
+    >
+      <span className={cn('absolute -top-5 left-0 rounded bg-primary px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-white', tab === 'text' ? 'block' : 'hidden group-hover:block')}>Drag text</span>
+    </div>
+  )
+}
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v))
 
 /** The 2-D canvas, letterboxed to the frame size. Drag moves, scroll zooms, shift-drag tilts. */
@@ -99,6 +143,7 @@ export function Stage2D() {
         style={{ width: w, height: h, background: 'repeating-conic-gradient(#2a2a2e 0% 25%, #1c1c20 0% 50%) 50% / 16px 16px' }}
       >
         {w > 0 && h > 0 && <ShotsScene />}
+        <TextHandle w={w} h={h} />
         {!hasMedia && (
           <div className="pointer-events-none absolute inset-x-0 bottom-4 flex justify-center">
             <label className="pointer-events-auto flex cursor-pointer items-center gap-3 rounded-full bg-black/70 py-1.5 pl-4 pr-1.5 text-[12px] text-white/85 shadow-lg backdrop-blur" onPointerDown={(e) => e.stopPropagation()}>

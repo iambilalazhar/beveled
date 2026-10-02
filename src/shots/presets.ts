@@ -23,6 +23,10 @@ export const DEFAULT_TEXT: TextState2D = {
   uppercase: false,
   area: 0.3,
   animate: true,
+  enter: 'words',
+  enterDuration: 1.1,
+  offsetX: 0,
+  offsetY: 0,
 }
 
 /** Type pairings for the Text tab. */
@@ -238,6 +242,7 @@ export const DEFAULT_SHOTS: ShotsProject = {
     parallax: false,
   },
   text: DEFAULT_TEXT,
+  set: [],
   base: BASE_LAYOUT,
   steps: [],
   export: { format: 'png', scale: 2, quality: 0.92, videoFormat: 'mp4', fps: 30, videoBitrate: 12, stillDuration: 4 },

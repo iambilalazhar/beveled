@@ -5,7 +5,8 @@ import { ColorRow, Section, SegmentRow, SelectRow, SliderRow, SwitchRow } from '
 import { AlignCenter, AlignLeft, AlignRight } from 'lucide-react'
 import { TEXT_STYLES } from '../presets'
 import { useShots } from '../store'
-import type { HighlightStyle, TextPlacement } from '../types'
+import type { HighlightStyle, TextEnter, TextPlacement } from '../types'
+import { Move, Play } from 'lucide-react'
 
 const PLACEMENTS: { id: TextPlacement; label: string; box: string }[] = [
   { id: 'none', label: 'None', box: '' },
@@ -16,11 +17,28 @@ const PLACEMENTS: { id: TextPlacement; label: string; box: string }[] = [
   { id: 'overlay', label: 'Over', box: 'inset-x-2 top-3 h-2' },
 ]
 
+const ENTRANCES: { id: TextEnter; label: string; hint: string }[] = [
+  { id: 'none', label: 'None', hint: 'Always visible' },
+  { id: 'fade', label: 'Fade', hint: 'The whole block fades in' },
+  { id: 'rise', label: 'Rise', hint: 'The block fades in while rising' },
+  { id: 'blur', label: 'Blur', hint: 'The block sharpens into focus' },
+  { id: 'lines', label: 'Lines', hint: 'Line by line' },
+  { id: 'words', label: 'Words', hint: 'Word by word, rising out of a blur' },
+  { id: 'letters', label: 'Letters', hint: 'Letter by letter, like typing' },
+  { id: 'pop', label: 'Pop', hint: 'Words pop in with a little bounce' },
+]
+
 const field = 'w-full rounded-lg bg-white/[0.05] px-3 py-2 text-[12px] text-white/90 outline-none placeholder:text-white/30 focus:ring-1 focus:ring-primary/60'
 
 export function TextTab() {
   const t = useShots((s) => s.project.text)
   const setText = useShots((s) => s.setText)
+  const seek = useShots((s) => s.seek)
+  const setPlaying = useShots((s) => s.setPlaying)
+  const preview = () => {
+    seek(0)
+    setPlaying(true)
+  }
   const fonts = FONT_FAMILIES.map((f) => ({ value: f, label: f }))
   // Load the pairing fonts so the style buttons preview in their own typeface.
   useEffect(() => {
@@ -124,8 +142,37 @@ export function TextTab() {
         <ColorRow label="Badge text" value={t.badgeText} onChange={(badgeText) => setText({ badgeText })} />
       </Section>
 
-      <Section title="Motion">
-        <SwitchRow label="Fade text up in videos" checked={t.animate} onChange={(animate) => setText({ animate })} />
+      <Section title="Entrance">
+        <div className="grid grid-cols-4 gap-1">
+          {ENTRANCES.map((e) => (
+            <button
+              key={e.id}
+              type="button"
+              title={e.hint}
+              onClick={() => setText({ enter: e.id, animate: e.id !== 'none' })}
+              className={cn('h-8 rounded-md font-mono text-[9px] uppercase tracking-wider', (t.animate === false ? 'none' : t.enter) === e.id ? 'bg-white/[0.14] text-white' : 'bg-white/[0.04] text-white/55 hover:text-white')}
+            >
+              {e.label}
+            </button>
+          ))}
+        </div>
+        {t.enter !== 'none' && t.animate !== false && (
+          <>
+            <SliderRow label="Duration" value={t.enterDuration} min={0.3} max={3} step={0.05} onChange={(enterDuration) => setText({ enterDuration })} format={(v) => `${v.toFixed(2)}s`} />
+            <button type="button" onClick={preview} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-white/[0.06] font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/10">
+              <Play className="size-3" /> Preview entrance
+            </button>
+          </>
+        )}
+      </Section>
+
+      <Section title="Position">
+        <p className="px-1 font-mono text-[9px] leading-relaxed text-white/40">Drag the text on the canvas to move it. It snaps back near its natural spot.</p>
+        {(t.offsetX !== 0 || t.offsetY !== 0) && (
+          <button type="button" onClick={() => setText({ offsetX: 0, offsetY: 0 })} className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-white/[0.06] font-mono text-[10px] uppercase tracking-wider text-white/75 hover:bg-white/10">
+            <Move className="size-3" /> Reset position
+          </button>
+        )}
       </Section>
     </div>
   )
