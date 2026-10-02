@@ -4,7 +4,7 @@ import { hydrateProject, useEditor, type Project } from '../store'
 const FORMAT = 'beveled-project'
 const VERSION = 1
 
-async function blobUrlToDataUrl(url: string): Promise<string> {
+export async function blobUrlToDataUrl(url: string): Promise<string> {
   const blob = await (await fetch(url)).blob()
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -14,13 +14,13 @@ async function blobUrlToDataUrl(url: string): Promise<string> {
   })
 }
 
-async function dataUrlToBlobUrl(url: string): Promise<string> {
+export async function dataUrlToBlobUrl(url: string): Promise<string> {
   const blob = await (await fetch(url)).blob()
   return URL.createObjectURL(blob)
 }
 
 /** Deep-maps every string value in a JSON-like value (media URLs live in many places). */
-async function mapStrings(value: unknown, fn: (s: string) => Promise<string>): Promise<unknown> {
+export async function mapStrings(value: unknown, fn: (s: string) => Promise<string>): Promise<unknown> {
   if (typeof value === 'string') return fn(value)
   if (Array.isArray(value)) return Promise.all(value.map((v) => mapStrings(v, fn)))
   if (value && typeof value === 'object') {

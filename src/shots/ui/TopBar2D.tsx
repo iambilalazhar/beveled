@@ -2,7 +2,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import { FRAME_PRESETS } from '@/mockup/presets'
 import { ModeSwitch } from '@/studio/ModeSwitch'
-import { ChevronDown, Download, Film, ImageIcon, LayoutTemplate, Redo2, RotateCcw, Undo2 } from 'lucide-react'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuShortcut, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { ChevronDown, Download, FilePlus2, Film, FolderOpen, ImageIcon, LayoutTemplate, Menu, Redo2, RotateCcw, Save, Undo2 } from 'lucide-react'
+import { pickShotsProject, saveShotsProject } from './projectFile2D'
 import { useState } from 'react'
 import { FRAME_RATIOS } from '../presets'
 import { useShots } from '../store'
@@ -172,6 +174,44 @@ function ExportMenu2D() {
   )
 }
 
+function Menu2D() {
+  const newProject = useShots((s) => s.newProject)
+  const setTemplatesOpen = useShots((s) => s.setTemplatesOpen)
+  const setTab = useShots((s) => s.setTab)
+  const item = 'gap-2 font-mono text-[10px] uppercase tracking-[0.08em]'
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" title="Menu" aria-label="Menu" className="flex size-8 items-center justify-center rounded-md text-white/70 hover:bg-white/10 hover:text-white">
+          <Menu className="size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-60 border-white/10 bg-[#161618] text-white">
+        <DropdownMenuItem className={item} onSelect={() => newProject()}>
+          <FilePlus2 className="size-3.5" /> Start over
+        </DropdownMenuItem>
+        <DropdownMenuItem className={item} onSelect={() => pickShotsProject()}>
+          <FolderOpen className="size-3.5" /> Open project… <DropdownMenuShortcut>⌘O</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuItem className={item} onSelect={() => void saveShotsProject()}>
+          <Save className="size-3.5" /> Save project <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem className={item} onSelect={() => setTemplatesOpen(true)}>
+          <LayoutTemplate className="size-3.5" /> Templates
+        </DropdownMenuItem>
+        <DropdownMenuItem className={item} onSelect={() => setTab('set')}>
+          <ImageIcon className="size-3.5" /> Screens set & ZIP export
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-white/10" />
+        <DropdownMenuItem className={item} asChild>
+          <a href="/classic">Classic editor</a>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 export function TopBar2D() {
   const canUndo = useShots((s) => s.past.length > 0)
   const canRedo = useShots((s) => s.future.length > 0)
@@ -182,6 +222,7 @@ export function TopBar2D() {
   const status = useShots((s) => s.status)
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-white/[0.06] bg-[#0d0d0f] px-3">
+      <Menu2D />
       <a href="/" className="flex items-center gap-2 pr-1" title="Beveled home">
         <img src="/beveled_icon.png" alt="" width={20} height={20} />
         <span className="logo-wordmark text-[15px] lowercase">beveled</span>
