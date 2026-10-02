@@ -7,9 +7,11 @@ import { MockupTab } from './MockupTab'
 import { Stage2D } from './Stage2D'
 import { Templates2D } from './Templates2D'
 import { Timeline2D } from './Timeline2D'
+import { SetTab } from './SetTab'
 import { TextTab } from './TextTab'
 import { TopBar2D } from './TopBar2D'
 import { useShotsMediaSources } from './useShotsMedia'
+import { pickShotsProject, saveShotsProject } from './projectFile2D'
 
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null
@@ -30,6 +32,12 @@ function useKeyboard() {
       } else if (mod && (e.key === 'e' || e.key === 'E')) {
         e.preventDefault()
         s.requestExport()
+      } else if (mod && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault()
+        void saveShotsProject()
+      } else if (mod && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault()
+        pickShotsProject()
       } else if (e.key === ' ' && !mod) {
         e.preventDefault()
         s.togglePlay()
@@ -73,8 +81,8 @@ export function ShotsEditor({ initialMedia = null, loadInitial = true }: { initi
       <TopBar2D />
       <div className="flex min-h-0 flex-1">
         <aside className="flex w-[300px] shrink-0 flex-col border-r border-white/[0.06] bg-[#111114]">
-          <div className="grid shrink-0 grid-cols-3 gap-0.5 p-2">
-            {(['mockup', 'text', 'frame'] as const).map((t) => (
+          <div className="grid shrink-0 grid-cols-4 gap-0.5 p-2">
+            {(['mockup', 'text', 'frame', 'set'] as const).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -85,7 +93,7 @@ export function ShotsEditor({ initialMedia = null, loadInitial = true }: { initi
               </button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">{tab === 'mockup' ? <MockupTab /> : tab === 'text' ? <TextTab /> : <FrameTab />}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-6 pt-2 [scrollbar-color:rgba(255,255,255,0.15)_transparent] [scrollbar-width:thin]">{tab === 'mockup' ? <MockupTab /> : tab === 'text' ? <TextTab /> : tab === 'set' ? <SetTab /> : <FrameTab />}</div>
         </aside>
         <main className="flex min-w-0 flex-1 flex-col">
           <Stage2D />

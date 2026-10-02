@@ -5,6 +5,8 @@ import { getCachedMedia, loadMediaTexture } from '@/mockup/scene/media'
 import type { ExportFormat } from '@/mockup/types'
 import { useShots } from '../store'
 import { totalDuration } from '../timeline'
+import { ensureFont } from '@/mockup/timeline/cardRender'
+import { makeZip } from '../zip'
 
 const MIME: Record<ExportFormat, string> = { png: 'image/png', jpeg: 'image/jpeg', webp: 'image/webp' }
 const tick = () => new Promise<void>((r) => setTimeout(r, 0))
@@ -24,6 +26,66 @@ export function ShotsExportBridge() {
   const size = useThree((s) => s.size)
   const exportRequest = useShots((s) => s.exportRequest)
   const videoRequest = useShots((s) => s.videoRequest)
+  const batchRequest = useShots((s) => s.batchRequest)
+
+  /* ---------------- screens set → ZIP ---------------- */
+  useEffect(() => {
+    if (!batchRequest) return
+    const { finishBatch, setStatus } = useShots.getState()
+    const original = useShots.getState().project
+    const frames = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())))
+    const run = async () => {
+      const { frame, export: exp, set, text } = original
+      const outW = frame.width
+      const outH = frame.height
+      const prevDpr = gl.getPixelRatio()
+      const files: { name: string; data: Uint8Array }[] = []
+      const ext = exp.format === 'jpeg' ? 'jpg' : exp.format
+      try {
+        await Promise.all([ensureFont(text.font, text.weight), ensureFont(text.bodyFont, 400), ensureFont(text.bodyFont, 600)])
+        for (let i = 0; i < set.length; i++) {
+          const it = set[i]
+          setStatus(`Exporting screen ${i + 1} of ${set.length}…`)
+          const media = it.media ?? original.mockup.media[0]
+          if (media?.url) await loadMediaTexture(media.url, media.kind === 'video' ? 'video' : 'image').catch(() => undefined)
+          // Show this screen without touching undo history, then let React and the textures settle.
+          useShots.setState({
+            project: { ...original, mockup: { ...original.mockup, media: [media, ...original.mockup.media.slice(1)] }, text: { ...original.text, eyebrow: it.eyebrow, headline: it.headline, subtitle: it.subtitle } },
+            time: 0,
+          })
+          await frames()
+          await frames()
+          gl.setPixelRatio(outW / Math.max(1, size.width))
+          advance(performance.now(), true)
+          advance(performance.now(), true)
+          const out = document.createElement('canvas')
+          out.width = outW
+          out.height = outH
+          const ctx = out.getContext('2d')!
+          if (exp.format === 'jpeg') {
+            ctx.fillStyle = '#fff'
+            ctx.fillRect(0, 0, outW, outH)
+          }
+          ctx.drawImage(gl.domElement, 0, 0, outW, outH)
+          gl.setPixelRatio(prevDpr)
+          const blob = await new Promise<Blob | null>((resolve) => out.toBlob(resolve, MIME[exp.format], exp.quality))
+          if (blob) files.push({ name: `${String(i + 1).padStart(2, '0')}-${frame.width}x${frame.height}.${ext}`, data: new Uint8Array(await blob.arrayBuffer()) })
+        }
+        downloadBlob(makeZip(files), `beveled-set-${stamp()}.zip`)
+        setStatus(`Exported ${files.length} screens (${outW}×${outH} ${ext.toUpperCase()}) as a ZIP`)
+      } catch (err) {
+        console.error(err)
+        setStatus(err instanceof Error ? err.message : 'Set export failed')
+      } finally {
+        gl.setPixelRatio(prevDpr)
+        useShots.setState({ project: original })
+        advance(performance.now(), true)
+        finishBatch()
+      }
+    }
+    void run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchRequest])
 
   useEffect(() => {
     if (!exportRequest) return

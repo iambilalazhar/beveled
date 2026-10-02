@@ -5,7 +5,7 @@ import type { Easing } from '@/mockup/timeline/types'
 import type { ExportFormat, MediaState } from '@/mockup/types'
 import { BASE_LAYOUT, DEFAULT_SHOTS } from './presets'
 import { layoutAt, stepEnd, totalDuration } from './timeline'
-import type { FrameState2D, Layout2D, MockupState, ShotsExport, ShotsProject, ShotsTemplate, TextState2D } from './types'
+import type { FrameState2D, Layout2D, MockupState, SetItem, ShotsExport, ShotsProject, ShotsTemplate, TextState2D } from './types'
 
 const STORAGE_KEY = 'beveled.shots.project.v1'
 const MAX_HISTORY = 80
@@ -22,7 +22,13 @@ type ShotsStore = {
   time: number
   playing: boolean
   loop: boolean
-  tab: 'mockup' | 'text' | 'frame'
+  tab: 'mockup' | 'text' | 'set' | 'frame'
+  /** Screen of the set shown on the canvas. */
+  activeSetId: string | null
+  /** Normalised bounds of the drawn text block (for dragging it on the stage). */
+  textBounds: { x: number; y: number; w: number; h: number } | null
+  batchRequest: { id: number } | null
+  batching: boolean
   rightTab: 'zoom' | 'tilt'
   templatesOpen: boolean
   exportRequest: ShotsExportRequest | null
@@ -55,7 +61,17 @@ type ShotsStore = {
   setPlaying: (playing: boolean) => void
   togglePlay: () => void
   setLoop: (loop: boolean) => void
-  setTab: (tab: 'mockup' | 'text' | 'frame') => void
+  setTab: (tab: 'mockup' | 'text' | 'set' | 'frame') => void
+  addSetItems: (items: Omit<SetItem, 'id'>[]) => void
+  updateSetItem: (id: string, patch: Partial<Omit<SetItem, 'id'>>) => void
+  removeSetItem: (id: string) => void
+  moveSetItem: (id: string, dir: -1 | 1) => void
+  activateSetItem: (id: string | null) => void
+  requestBatch: () => void
+  finishBatch: () => void
+  setTextBounds: (b: { x: number; y: number; w: number; h: number } | null) => void
+  /** Replaces the whole 2-D project (opened from a file). */
+  loadProject: (p: ShotsProject) => void
   setRightTab: (tab: 'zoom' | 'tilt') => void
   setTemplatesOpen: (open: boolean) => void
   requestExport: (req?: Partial<Omit<ShotsExportRequest, 'id'>>) => void
@@ -88,6 +104,7 @@ function hydrate(saved: Partial<ShotsProject>, keepMedia = false): ShotsProject 
     mockup: { ...base.mockup, ...saved.mockup, media },
     frame: { ...frame, background: { ...base.frame.background, ...frame.background } },
     text: { ...base.text, ...saved.text },
+    set: (saved.set ?? []).map((it) => ({ ...it, media: it.media && (keepMedia || !it.media.url?.startsWith('blob:')) ? it.media : null })),
     base: { ...BASE_LAYOUT, ...saved.base },
     steps: (saved.steps ?? []).map((s) => ({ ...s, layout: { ...BASE_LAYOUT, ...s.layout }, easing: s.easing ?? { ...DEFAULT_EASING } })),
     export: { ...base.export, ...saved.export },
@@ -117,6 +134,7 @@ function persist(p: ShotsProject) {
         ...p,
         mockup: { ...p.mockup, media: p.mockup.media.map((m) => (m && keep(m.url) ? m : null)) },
         frame: { ...p.frame, background: { ...p.frame.background, image: keep(p.frame.background.image) } },
+        set: p.set.map((it) => ({ ...it, media: it.media && keep(it.media.url) ? it.media : null })),
       }
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(slim))
     } catch {
@@ -162,6 +180,10 @@ export const useShots = create<ShotsStore>((set, get) => {
     playing: false,
     loop: true,
     tab: 'mockup',
+    activeSetId: null,
+    textBounds: null,
+    batchRequest: null,
+    batching: false,
     rightTab: 'zoom',
     templatesOpen: false,
     exportRequest: null,
@@ -253,6 +275,7 @@ export const useShots = create<ShotsStore>((set, get) => {
         mockup: { ...fresh0.mockup, ...t.mockup, media: p.mockup.media },
         frame: { ...fresh0.frame, ...t.frame, width: t.frame?.width ?? p.frame.width, height: t.frame?.height ?? p.frame.height, background: { ...fresh0.frame.background, ...t.frame?.background } },
         text: { ...fresh0.text, ...t.text },
+        set: p.set,
         base,
         steps,
       }
@@ -260,7 +283,7 @@ export const useShots = create<ShotsStore>((set, get) => {
     },
     newProject: () => {
       const p = get().project
-      const project = { ...fresh(), mockup: { ...fresh().mockup, media: [p.mockup.media[0], null, null] } }
+      const project = { ...fresh(), set: p.set, mockup: { ...fresh().mockup, media: [p.mockup.media[0], null, null] } }
       commit(project, { selected: 'base', time: 0, playing: false }, { force: true })
     },
     undo: () => {
@@ -279,6 +302,63 @@ export const useShots = create<ShotsStore>((set, get) => {
       persist(next)
       set({ project: next, past: [...s.past, s.project].slice(-MAX_HISTORY), future: s.future.slice(1), selected: 'base', time: 0 })
     },
+
+    addSetItems: (items) => {
+      const p = get().project
+      const added = items.map((it) => ({ ...it, id: newId('scr') }))
+      commit({ ...p, set: [...p.set, ...added] }, {}, { force: true })
+      if (!get().activeSetId && added[0]) get().activateSetItem(added[0].id)
+    },
+    updateSetItem: (id, patch) => {
+      const s = get()
+      const p = s.project
+      const set = p.set.map((it) => (it.id === id ? { ...it, ...patch } : it))
+      let project = { ...p, set }
+      // The active screen mirrors its copy into the text layer.
+      if (s.activeSetId === id) {
+        const it = set.find((x) => x.id === id)!
+        project = { ...project, text: { ...project.text, eyebrow: it.eyebrow, headline: it.headline, subtitle: it.subtitle } }
+        if (patch.media) project = { ...project, mockup: { ...project.mockup, media: [patch.media, ...project.mockup.media.slice(1)] } }
+      }
+      commit(project, {}, { tag: `set:${id}:${Object.keys(patch).join()}` })
+    },
+    removeSetItem: (id) => {
+      const s = get()
+      commit({ ...s.project, set: s.project.set.filter((it) => it.id !== id) }, { activeSetId: s.activeSetId === id ? null : s.activeSetId }, { force: true })
+    },
+    moveSetItem: (id, dir) => {
+      const p = get().project
+      const i = p.set.findIndex((it) => it.id === id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= p.set.length) return
+      const set = [...p.set]
+      ;[set[i], set[j]] = [set[j], set[i]]
+      commit({ ...p, set }, {}, { force: true })
+    },
+    activateSetItem: (id) => {
+      const s = get()
+      const it = s.project.set.find((x) => x.id === id)
+      if (!it) return set({ activeSetId: null })
+      const p = s.project
+      const project = {
+        ...p,
+        mockup: it.media ? { ...p.mockup, media: [it.media, ...p.mockup.media.slice(1)] } : p.mockup,
+        text: { ...p.text, eyebrow: it.eyebrow, headline: it.headline, subtitle: it.subtitle },
+      }
+      commit(project, { activeSetId: id }, { tag: `activate:${id}` })
+    },
+    requestBatch: () => {
+      const s = get()
+      if (s.exporting || s.recording || s.batching || !s.project.set.length) return
+      set({ batching: true, playing: false, batchRequest: { id: Date.now() } })
+    },
+    finishBatch: () => set({ batching: false, batchRequest: null }),
+    setTextBounds: (b) => {
+      const prev = get().textBounds
+      if (prev && b && Math.abs(prev.x - b.x) + Math.abs(prev.y - b.y) + Math.abs(prev.w - b.w) + Math.abs(prev.h - b.h) < 1e-4) return
+      set({ textBounds: b })
+    },
+    loadProject: (project) => commit(project, { selected: 'base', time: 0, playing: false, activeSetId: null }, { force: true }),
 
     seek: (t) => set({ time: clamp(t, 0, totalDuration(get().project)) }),
     setTimeFromPlayback: (time) => set({ time }),

@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react'
-import type { MediaKind } from '@/mockup/types'
+import type { MediaKind, MediaState } from '@/mockup/types'
 import { probeImage, probeVideo, useInitialMedia } from '@/mockup/ui/useMediaLoader'
 import { useShots } from '../store'
 
@@ -64,3 +64,17 @@ export function useShotsMediaSources(initial: Blob | string | null | undefined, 
   }, [])
 }
 
+
+/** Reads an image or video file into a MediaState (object URL plus dimensions). */
+export async function fileToMedia(file: File): Promise<MediaState | null> {
+  if (!file.type.startsWith('image/') && !file.type.startsWith('video/')) return null
+  const kind: MediaKind = file.type.startsWith('video/') ? 'video' : 'image'
+  const url = URL.createObjectURL(file)
+  try {
+    const dims = kind === 'video' ? await probeVideo(url) : await probeImage(url)
+    return { url, kind, width: dims.width, height: dims.height, name: file.name }
+  } catch {
+    URL.revokeObjectURL(url)
+    return null
+  }
+}
