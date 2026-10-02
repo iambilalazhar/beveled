@@ -31,7 +31,9 @@ The original 2D screenshot beautifier is still available at `/classic`.
 - **Layout**: zoom, position and 3-D tilt (drag the canvas to move, scroll to zoom, ⇧-drag to tilt) and ten layout presets (tilts, lay back, isometric, float, corner zooms, hero crop).
 - **Animation**: *Add animation* appends a layout step on the timeline; each step eases from the previous layout with its own duration and bezier easing. Optional parallax idle motion.
 - **Export**: PNG / JPG / WebP at 1×–4× of the frame size, and frame-accurate MP4 / WebM of the animation (videos on screen are seeked per frame).
-- **Text**: an eyebrow, headline, subtitle and badge placed above, below, beside or over the mockup. The mockup moves out of the way automatically. Wrap words in `*stars*` to highlight them (colour, marker, underline or italic). Eight type pairings and all 30 fonts; text fades up in videos.
+- **Text**: an eyebrow, headline, subtitle and badge placed above, below, beside or over the mockup. The mockup moves out of the way automatically. Wrap words in `*stars*` to highlight them (colour, marker, underline or italic). Eight type pairings and all 30 fonts. Drag the text anywhere on the canvas. Entrances for video: fade, rise, blur, line by line, word by word, letter by letter or pop.
+- **Screens set**: one design, many screens — add several screenshots, give each its own eyebrow / headline / subtitle, preview any of them, and export them all at the exact frame size as a ZIP (App Store and Play Store listings, carousels, changelogs).
+- **Projects**: save and open the whole 2D project (design, copy, set, animation and media) as a `.beveled.json` file (⌘S / ⌘O).
 - **71 templates** with rendered previews, browsable by App Store, Social, Launch, Features, Minimal, Dark, Glass, Devices, With text and Animated, plus search. They include App Store / Play Store screenshots at store sizes, Instagram posts and stories, X, LinkedIn, YouTube thumbnails, Product Hunt and Open Graph images, feature announcements and animated tours.
 
 ### 3D studio (UltraMock-style)
